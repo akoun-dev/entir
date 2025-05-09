@@ -4,7 +4,9 @@ import {
   Settings, Building2, Users, Globe, Database,
   FileText, Layers, CreditCard, Languages, DollarSign,
   Server, Shield, Mail, Workflow, FileSpreadsheet, Printer,
-  ShoppingCart, Truck
+  ShoppingCart, Truck, Bell, HardDrive, Cloud, Lock,
+  Palette, Moon, Calendar,
+  Hash, Gauge, Activity
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -76,6 +78,87 @@ const SettingsOverview: React.FC = () => {
       items: [
         { id: 'payment_providers', name: 'Fournisseurs de paiement', icon: <CreditCard className="w-4 h-4" />, route: '/settings/payment-providers' },
         { id: 'shipping_methods', name: 'Méthodes d\'expédition', icon: <Truck className="w-4 h-4" />, route: '/settings/shipping-methods' }
+      ]
+    },
+    {
+      id: 'notifications',
+      name: 'Notifications',
+      icon: <Bell className="w-8 h-8 text-pink-500" />,
+      description: 'Configuration des canaux et modèles de notification',
+      items: [
+        { id: 'notifications', name: 'Paramètres', icon: <Bell className="w-4 h-4" />, route: '/settings/notifications' }
+      ]
+    },
+    {
+      id: 'backup',
+      name: 'Sauvegarde',
+      icon: <HardDrive className="w-8 h-8 text-indigo-500" />,
+      description: 'Gestion des sauvegardes et restauration',
+      items: [
+        { id: 'backup', name: 'Configuration', icon: <Cloud className="w-4 h-4" />, route: '/settings/backup' }
+      ]
+    },
+    {
+      id: 'appearance',
+      name: 'Apparence',
+      icon: <Palette className="w-8 h-8 text-teal-500" />,
+      description: 'Personnalisation de l\'interface utilisateur',
+      items: [
+        { id: 'appearance', name: 'Thèmes', icon: <Moon className="w-4 h-4" />, route: '/settings/appearance' }
+      ]
+    },
+    {
+      id: 'workflows',
+      name: 'Workflows',
+      icon: <Workflow className="w-8 h-8 text-cyan-500" />,
+      description: 'Configuration des flux de travail automatisés',
+      items: [
+        { id: 'workflows', name: 'Gestion', icon: <Workflow className="w-4 h-4" />, route: '/settings/workflows' }
+      ]
+    },
+    {
+      id: 'compliance',
+      name: 'Conformité',
+      icon: <Shield className="w-8 h-8 text-amber-500" />,
+      description: 'Gestion de la conformité réglementaire',
+      items: [
+        { id: 'compliance', name: 'Paramètres', icon: <Shield className="w-4 h-4" />, route: '/settings/compliance' }
+      ]
+    },
+    {
+      id: 'import-export',
+      name: 'Import/Export',
+      icon: <FileText className="w-8 h-8 text-blue-500" />,
+      description: 'Outils d\'échange de données',
+      items: [
+        { id: 'import-export', name: 'Configuration', icon: <FileText className="w-4 h-4" />, route: '/settings/import-export' }
+      ]
+    },
+    {
+      id: 'calendar',
+      name: 'Calendrier',
+      icon: <Calendar className="w-8 h-8 text-red-500" />,
+      description: 'Configuration des calendriers et plannings',
+      items: [
+        { id: 'calendar', name: 'Paramètres', icon: <Calendar className="w-4 h-4" />, route: '/settings/calendar' }
+      ]
+    },
+    {
+      id: 'sequences',
+      name: 'Numération',
+      icon: <Hash className="w-8 h-8 text-purple-500" />,
+      description: 'Gestion des séquences de numérotation',
+      items: [
+        { id: 'sequences', name: 'Configuration', icon: <Hash className="w-4 h-4" />, route: '/settings/sequences' }
+      ]
+    },
+    {
+      id: 'performance',
+      name: 'Performance',
+      icon: <Gauge className="w-8 h-8 text-green-500" />,
+      description: 'Optimisation des performances du système',
+      items: [
+        { id: 'performance', name: 'Paramètres', icon: <Activity className="w-4 h-4" />, route: '/settings/performance' }
       ]
     }
   ];

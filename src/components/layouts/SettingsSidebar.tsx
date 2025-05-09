@@ -241,7 +241,7 @@ const SettingsSidebar: React.FC = () => {
           <Settings className="w-5 h-5 mr-2 text-ivory-orange" />
           Paramètres
         </h2>
-        <p className="text-sm text-sidebar-foreground/70 mt-1">Configuration globale de l'application</p>
+        <p className="text-sm text-sidebar-foreground/70 mt-1">Configuration globale de l'application0</p>
       </div>
 
       {/* Contenu du menu */}
