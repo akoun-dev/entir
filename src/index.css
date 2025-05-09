@@ -1,0 +1,148 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 30% 98%;
+    --foreground: 20 40% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 20 40% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 40% 15%;
+
+    /* Orange couleur de la Côte d'Ivoire */
+    --primary: 24 100% 50%;
+    --primary-foreground: 210 40% 98%;
+
+    /* Blanc avec une touche de chaleur */
+    --secondary: 40 30% 96%;
+    --secondary-foreground: 20 40% 15%;
+
+    --muted: 40 20% 92%;
+    --muted-foreground: 25 5% 45%;
+
+    /* Vert avec légère transparence */
+    --accent: 142 70% 30%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 20 15% 85%;
+    --input: 20 15% 85%;
+    --ring: 24 100% 50%;
+
+    --radius: 0.6rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 24 100% 50%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 24 100% 50%;
+  }
+
+  .dark {
+    --background: 20 40% 10%;
+    --foreground: 20 15% 90%;
+
+    --card: 20 40% 12%;
+    --card-foreground: 20 15% 90%;
+
+    --popover: 20 40% 12%;
+    --popover-foreground: 20 15% 90%;
+
+    --primary: 24 100% 50%;
+    --primary-foreground: 20 15% 90%;
+
+    --secondary: 20 25% 18%;
+    --secondary-foreground: 20 15% 90%;
+
+    --muted: 20 25% 18%;
+    --muted-foreground: 20 15% 65%;
+
+    --accent: 142 60% 25%;
+    --accent-foreground: 20 15% 90%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 20 25% 20%;
+    --input: 20 25% 18%;
+    --ring: 24 100% 50%;
+
+    --sidebar-background: 20 40% 12%;
+    --sidebar-foreground: 40 15% 90%;
+    --sidebar-primary: 24 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 20 25% 18%;
+    --sidebar-accent-foreground: 40 15% 90%;
+    --sidebar-border: 20 25% 20%;
+    --sidebar-ring: 24 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='rgba(0, 153, 51, 0.02)' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+}
+
+@layer components {
+  .ivory-card {
+    @apply bg-white border-l-4 border-ivory-orange shadow-md hover:shadow-lg transition-shadow;
+  }
+  
+  .ivory-button {
+    @apply bg-ivory-orange text-white font-medium hover:bg-ivory-orange/90 transition-colors;
+  }
+  
+  .ivory-button-secondary {
+    @apply bg-ivory-green text-white font-medium hover:bg-ivory-green/90 transition-colors;
+  }
+
+  .kente-border {
+    @apply border-b-4 border-l-4 border-r-0 border-t-0 border-ivory-orange relative;
+  }
+  
+  .kente-border::after {
+    content: "";
+    @apply absolute bottom-0 left-0 w-full h-1 bg-ivory-green;
+    transform: translateY(4px);
+  }
+
+  .adinkra-bg {
+    background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h20v20H0V0zm10 17c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm0-1.5c3.033 0 5.5-2.467 5.5-5.5S13.033 5 10 5 4.5 7.467 4.5 10s2.467 5.5 5.5 5.5z' fill='rgba(255,102,0,0.05)' fill-rule='evenodd'/%3E%3C/svg%3E");
+  }
+
+  /* Glassmorphism effect */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-lg dark:bg-black/40 dark:border-white/10;
+  }
+  
+  /* Enhanced hover effects */
+  .hover-lift {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+  
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-ivory-orange via-ivory-orange to-orange-500 bg-clip-text text-transparent;
+  }
+  
+  /* Animated underline */
+  .animated-underline {
+    @apply relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:origin-bottom-left after:scale-x-0 after:bg-ivory-orange after:transition-transform after:duration-300 hover:after:origin-bottom-left hover:after:scale-x-100;
+  }
+}
