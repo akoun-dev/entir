@@ -33,8 +33,21 @@ const AppRoutes = () => {
     const addonManager = AddonManager.getInstance();
     const routes = addonManager.getAllRoutes();
     console.log("Routes chargées:", routes);
+
+    // Vérifier si les routes sont correctement chargées
+    if (routes.length === 0) {
+      console.error("Aucune route n'a été chargée depuis les modules");
+    } else {
+      routes.forEach((route, index) => {
+        console.log(`Route ${index}:`, route);
+      });
+    }
+
     setAddonRoutes(routes);
   }, []);
+
+  // Afficher les routes dans la console pour le débogage
+  console.log("Rendu des routes:", addonRoutes);
 
   return (
     <BrowserRouter>
@@ -45,6 +58,7 @@ const AppRoutes = () => {
 
           {/* Routes des addons */}
           {addonRoutes.map((route, index) => {
+            console.log(`Rendu de la route ${index}:`, route);
             // Si la route est un élément React valide, on le rend directement
             if (React.isValidElement(route)) {
               return React.cloneElement(route, { key: `addon-route-${index}` });
@@ -56,6 +70,14 @@ const AppRoutes = () => {
               </React.Fragment>
             );
           })}
+
+          {/* Route explicite pour le module HR (solution temporaire) */}
+          <Route path="hr" element={<React.Suspense fallback={<div>Chargement...</div>}>
+            {React.createElement(
+              // @ts-ignore - Ignorer l'erreur de type pour le moment
+              React.lazy(() => import('../addons/hr/views/pages/HrDashboardView'))
+            )}
+          </React.Suspense>} />
 
           {/* Route de fallback */}
           <Route path="*" element={<NotFound />} />

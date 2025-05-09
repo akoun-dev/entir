@@ -25,11 +25,22 @@ const AddonLoader: React.FC<AddonLoaderProps> = ({ children }) => {
         // Enregistrer chaque module découvert
         for (const addon of modules) {
           console.log(`Enregistrement du module ${addon.manifest.name}...`);
+          console.log(`Routes du module ${addon.manifest.name}:`, addon.routes);
           addonManager.registerAddon(addon);
         }
 
         // Vérifier que les routes sont bien enregistrées
-        console.log("Routes après enregistrement:", addonManager.getAllRoutes());
+        const allRoutes = addonManager.getAllRoutes();
+        console.log("Routes après enregistrement:", allRoutes);
+
+        // Vérifier spécifiquement les routes du module HR
+        const hrAddon = addonManager.getAddon('hr');
+        if (hrAddon) {
+          console.log("Module HR trouvé:", hrAddon);
+          console.log("Routes du module HR:", hrAddon.routes);
+        } else {
+          console.error("Module HR non trouvé dans le gestionnaire d'addons");
+        }
 
         // Afficher tous les menus enregistrés
         console.log("Menus enregistrés:", addonManager.getAllMenus());

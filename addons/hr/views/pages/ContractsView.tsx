@@ -206,22 +206,16 @@ const ContractsView: React.FC = () => {
       <div className="w-full">
         {/* En-tête avec fil d'Ariane */}
         <div className="mb-6">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/hr">RH</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Contrats</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-
           <div className="flex items-center gap-3 mt-4">
             <div className="h-6 w-1.5 bg-amber-500 rounded-full"></div>
             <FileText className="h-6 w-6 text-amber-500" />
             <h1 className="text-2xl font-bold">Gestion des Contrats</h1>
+          </div>
+
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mt-4 gap-4">
+            <p className="text-muted-foreground">
+              Gérez les contrats des employés, supervisez les dates d'expiration et effectuez des actions en conséquence
+            </p>
           </div>
         </div>
 
