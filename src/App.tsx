@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AddonLoader from "./components/AddonLoader";
 import AddonManager from "./core/AddonManager";
+import SettingsRoutes from "./routes/SettingsRoutes";
 
 // Création du client de requête
 const queryClient = new QueryClient();
@@ -78,6 +79,9 @@ const AppRoutes = () => {
               React.lazy(() => import('../addons/hr/views/pages/HrDashboardView'))
             )}
           </React.Suspense>} />
+
+          {/* Routes des paramètres */}
+          {SettingsRoutes}
 
           {/* Route de fallback */}
           <Route path="*" element={<NotFound />} />

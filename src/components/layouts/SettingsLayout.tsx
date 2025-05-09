@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { RenewedSidebar } from './RenewedSidebar';
+import { DynamicSidebar } from './DynamicSidebar';
 import SettingsSidebar from './SettingsSidebar';
 import { cn } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -13,35 +13,29 @@ import { Menu, X } from 'lucide-react';
 const SettingsLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsSidebarOpen, setIsSettingsSidebarOpen] = useState(true);
-  
+
   // Gérer l'ouverture/fermeture de la sidebar principale
   const handleSidebarToggle = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
-  
+
   // Gérer l'ouverture/fermeture de la sidebar des paramètres
   const handleSettingsSidebarToggle = () => {
     setIsSettingsSidebarOpen(!isSettingsSidebarOpen);
   };
-  
+
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar principale */}
-      <RenewedSidebar isOpen={isSidebarOpen} onToggle={handleSidebarToggle} />
-      
+    <div className="flex-1 h-screen overflow-hidden bg-background">
       {/* Contenu avec sidebar des paramètres */}
-      <div className={cn(
-        "flex-1 flex transition-all duration-300",
-        isSidebarOpen ? "md:ml-64" : "md:ml-16"
-      )}>
+      <div className="flex-1 flex">
         {/* Sidebar des paramètres */}
         <div className={cn(
-          "h-full transition-all duration-300 hidden md:block",
+          "h-full transition-all duration-300 hidden md:block border-r border-sidebar-border",
           isSettingsSidebarOpen ? "w-72" : "w-0 opacity-0"
         )}>
           <SettingsSidebar />
         </div>
-        
+
         {/* Contenu principal */}
         <main className="flex-1 overflow-y-auto">
           {/* Bouton pour afficher/masquer la sidebar des paramètres sur mobile */}
@@ -51,7 +45,7 @@ const SettingsLayout: React.FC = () => {
               Menu des paramètres
             </Button>
           </div>
-          
+
           {/* Sidebar des paramètres sur mobile */}
           <div className={cn(
             "fixed inset-0 z-50 bg-background/80 backdrop-blur-sm transition-all duration-300 md:hidden",
@@ -62,9 +56,9 @@ const SettingsLayout: React.FC = () => {
               isSettingsSidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
               <SettingsSidebar />
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="absolute top-4 right-4"
                 onClick={handleSettingsSidebarToggle}
               >
@@ -73,9 +67,11 @@ const SettingsLayout: React.FC = () => {
               </Button>
             </div>
           </div>
-          
+
           {/* Contenu de la page */}
-          <Outlet />
+          <div className="w-full">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

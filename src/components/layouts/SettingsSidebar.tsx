@@ -41,7 +41,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../compo
 const SettingsSidebar: React.FC = () => {
   const location = useLocation();
   const [openCategories, setOpenCategories] = useState<string[]>(['general']);
-  
+
   // Catégories de paramètres basées sur Odoo
   const settingsCategories = [
     {
@@ -118,22 +118,22 @@ const SettingsSidebar: React.FC = () => {
       ]
     }
   ];
-  
+
   // Vérifier si un item est actif
   const isActive = (route: string) => location.pathname === route;
-  
+
   // Vérifier si une catégorie est active (au moins un de ses items est actif)
   const isCategoryActive = (items: any[]) => items.some(item => isActive(item.route) || location.pathname.startsWith(item.route));
-  
+
   // Gérer l'ouverture/fermeture des catégories
   const toggleCategory = (categoryId: string) => {
-    setOpenCategories(prev => 
-      prev.includes(categoryId) 
-        ? prev.filter(id => id !== categoryId) 
+    setOpenCategories(prev =>
+      prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
         : [...prev, categoryId]
     );
   };
-  
+
   // Ouvrir automatiquement la catégorie active
   React.useEffect(() => {
     settingsCategories.forEach(category => {
@@ -142,9 +142,9 @@ const SettingsSidebar: React.FC = () => {
       }
     });
   }, [location.pathname]);
-  
+
   return (
-    <aside className="w-72 bg-sidebar border-r border-sidebar-border h-full overflow-y-auto">
+    <aside className="w-72 bg-sidebar h-full overflow-y-auto">
       {/* En-tête */}
       <div className="p-4 border-b border-sidebar-border">
         <h2 className="text-xl font-semibold flex items-center text-sidebar-foreground">
@@ -153,12 +153,12 @@ const SettingsSidebar: React.FC = () => {
         </h2>
         <p className="text-sm text-sidebar-foreground/70 mt-1">Configuration globale de l'application</p>
       </div>
-      
+
       {/* Contenu du menu */}
       <div className="py-2">
         {settingsCategories.map(category => (
-          <Collapsible 
-            key={category.id} 
+          <Collapsible
+            key={category.id}
             open={openCategories.includes(category.id)}
             onOpenChange={() => toggleCategory(category.id)}
             className="border-b border-sidebar-border/50"
@@ -169,8 +169,8 @@ const SettingsSidebar: React.FC = () => {
                 isCategoryActive(category.items) ? "text-ivory-orange font-medium" : "text-sidebar-foreground"
               )}>
                 <div className="flex items-center">
-                  {React.cloneElement(category.icon, { 
-                    className: cn("mr-2", isCategoryActive(category.items) ? "text-ivory-orange" : "text-sidebar-foreground/70") 
+                  {React.cloneElement(category.icon, {
+                    className: cn("mr-2", isCategoryActive(category.items) ? "text-ivory-orange" : "text-sidebar-foreground/70")
                   })}
                   <span>{category.name}</span>
                 </div>
@@ -190,7 +190,7 @@ const SettingsSidebar: React.FC = () => {
                         to={item.route}
                         className={({ isActive }) => cn(
                           "flex items-center justify-between px-6 py-2 text-sm transition-colors",
-                          isActive 
+                          isActive
                             ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                             : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                         )}

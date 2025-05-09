@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, Search, Plus, MoreHorizontal, 
+import {
+  DollarSign, Search, Plus, MoreHorizontal,
   Edit, Trash2, Save, Check, X, ArrowUpDown
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -37,7 +37,7 @@ const CurrenciesSettings: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddCurrencyDialogOpen, setIsAddCurrencyDialogOpen] = useState(false);
   const [editingCurrency, setEditingCurrency] = useState<string | null>(null);
-  
+
   // État pour le formulaire d'ajout de devise
   const [newCurrency, setNewCurrency] = useState({
     name: '',
@@ -49,13 +49,13 @@ const CurrenciesSettings: React.FC = () => {
     rounding: '0.01',
     active: true
   });
-  
+
   // Données simulées pour les devises (basées sur Odoo)
   const [currencies, setCurrencies] = useState([
-    { 
-      id: '1', 
-      name: 'Euro', 
-      symbol: '€', 
+    {
+      id: '1',
+      name: 'Euro',
+      symbol: '€',
       code: 'EUR',
       rate: 1.0,
       position: 'after',
@@ -63,10 +63,10 @@ const CurrenciesSettings: React.FC = () => {
       rounding: 0.01,
       active: true
     },
-    { 
-      id: '2', 
-      name: 'Dollar américain', 
-      symbol: '$', 
+    {
+      id: '2',
+      name: 'Dollar américain',
+      symbol: '$',
       code: 'USD',
       rate: 1.08,
       position: 'before',
@@ -74,10 +74,10 @@ const CurrenciesSettings: React.FC = () => {
       rounding: 0.01,
       active: true
     },
-    { 
-      id: '3', 
-      name: 'Livre sterling', 
-      symbol: '£', 
+    {
+      id: '3',
+      name: 'Livre sterling',
+      symbol: '£',
       code: 'GBP',
       rate: 0.85,
       position: 'before',
@@ -85,10 +85,10 @@ const CurrenciesSettings: React.FC = () => {
       rounding: 0.01,
       active: true
     },
-    { 
-      id: '4', 
-      name: 'Franc suisse', 
-      symbol: 'CHF', 
+    {
+      id: '4',
+      name: 'Franc suisse',
+      symbol: 'CHF',
       code: 'CHF',
       rate: 0.96,
       position: 'after',
@@ -96,10 +96,10 @@ const CurrenciesSettings: React.FC = () => {
       rounding: 0.01,
       active: true
     },
-    { 
-      id: '5', 
-      name: 'Yen japonais', 
-      symbol: '¥', 
+    {
+      id: '5',
+      name: 'Yen japonais',
+      symbol: '¥',
       code: 'JPY',
       rate: 160.45,
       position: 'before',
@@ -108,30 +108,30 @@ const CurrenciesSettings: React.FC = () => {
       active: false
     }
   ]);
-  
+
   // Filtrer les devises en fonction du terme de recherche
-  const filteredCurrencies = currencies.filter(currency => 
+  const filteredCurrencies = currencies.filter(currency =>
     currency.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     currency.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     currency.symbol.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
+
   // Gérer les changements dans le formulaire d'ajout de devise
   const handleNewCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setNewCurrency(prev => ({ ...prev, [name]: value }));
   };
-  
+
   // Gérer les changements de select dans le formulaire d'ajout de devise
   const handleNewCurrencySelectChange = (name: string, value: string) => {
     setNewCurrency(prev => ({ ...prev, [name]: value }));
   };
-  
+
   // Gérer les changements de switch dans le formulaire d'ajout de devise
   const handleNewCurrencySwitchChange = (name: string, checked: boolean) => {
     setNewCurrency(prev => ({ ...prev, [name]: checked }));
   };
-  
+
   // Ajouter une nouvelle devise
   const handleAddCurrency = () => {
     const newId = (currencies.length + 1).toString();
@@ -146,7 +146,7 @@ const CurrenciesSettings: React.FC = () => {
       rounding: parseFloat(newCurrency.rounding),
       active: newCurrency.active
     };
-    
+
     setCurrencies([...currencies, newCurrencyWithId]);
     setNewCurrency({
       name: '',
@@ -160,40 +160,40 @@ const CurrenciesSettings: React.FC = () => {
     });
     setIsAddCurrencyDialogOpen(false);
   };
-  
+
   // Activer/désactiver une devise
   const toggleCurrencyStatus = (currencyId: string) => {
-    setCurrencies(currencies.map(currency => 
+    setCurrencies(currencies.map(currency =>
       currency.id === currencyId ? { ...currency, active: !currency.active } : currency
     ));
   };
-  
+
   // Supprimer une devise
   const deleteCurrency = (currencyId: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette devise ?')) {
       setCurrencies(currencies.filter(currency => currency.id !== currencyId));
     }
   };
-  
+
   // Commencer l'édition d'une devise
   const startEditingCurrency = (currencyId: string) => {
     setEditingCurrency(currencyId);
   };
-  
+
   // Terminer l'édition d'une devise
   const finishEditingCurrency = () => {
     setEditingCurrency(null);
   };
-  
+
   // Mettre à jour une devise en cours d'édition
   const updateCurrency = (currencyId: string, field: string, value: string | number | boolean) => {
-    setCurrencies(currencies.map(currency => 
+    setCurrencies(currencies.map(currency =>
       currency.id === currencyId ? { ...currency, [field]: value } : currency
     ));
   };
-  
+
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="w-full px-4 py-6">
       {/* En-tête */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
@@ -239,7 +239,7 @@ const CurrenciesSettings: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="symbol">Symbole <span className="text-destructive">*</span></Label>
@@ -266,7 +266,7 @@ const CurrenciesSettings: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="decimal_places">Décimales</Label>
@@ -294,7 +294,7 @@ const CurrenciesSettings: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="position">Position du symbole</Label>
                 <Select
@@ -310,7 +310,7 @@ const CurrenciesSettings: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Switch
                   id="active"
