@@ -58,7 +58,7 @@ export const SettingsService = {
    */
   async getAllSettings(): Promise<Record<string, Settings>> {
     const response = await axios.get(`${API_BASE_URL}/settings`);
-    return response.data;
+    return response.data as Record<string, Settings>;
   }
 };
 
