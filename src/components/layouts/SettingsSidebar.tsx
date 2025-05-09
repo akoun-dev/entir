@@ -116,6 +116,96 @@ const SettingsSidebar: React.FC = () => {
         { id: 'shipping_methods', name: 'Méthodes d\'expédition', icon: <Truck className="w-4 h-4" />, route: '/settings/shipping-methods' },
         { id: 'external_services', name: 'Services externes', icon: <Globe className="w-4 h-4" />, route: '/settings/external-services' }
       ]
+    },
+    {
+      id: 'notifications',
+      name: 'Notifications',
+      icon: <Bell className="w-5 h-5" />,
+      description: 'Configuration des notifications et alertes',
+      items: [
+        { id: 'notifications_settings', name: 'Paramètres de notifications', icon: <Bell className="w-4 h-4" />, route: '/settings/notifications-settings' }
+      ]
+    },
+    {
+      id: 'audit',
+      name: 'Audit',
+      icon: <FileText className="w-5 h-5" />,
+      description: 'Configuration des audits et traçabilité',
+      items: [
+        { id: 'audit_settings', name: 'Paramètres d\'audit', icon: <FileText className="w-4 h-4" />, route: '/settings/audit-settings' }
+      ]
+    },
+    {
+      id: 'backup',
+      name: 'Sauvegarde',
+      icon: <Database className="w-5 h-5" />,
+      description: 'Gestion des sauvegardes et restaurations',
+      items: [
+        { id: 'backup_settings', name: 'Paramètres de sauvegarde', icon: <Database className="w-4 h-4" />, route: '/settings/backup-settings' }
+      ]
+    },
+    {
+      id: 'appearance',
+      name: 'Apparence',
+      icon: <BarChart className="w-5 h-5" />,
+      description: 'Personnalisation de l\'interface utilisateur',
+      items: [
+        { id: 'appearance_settings', name: 'Paramètres d\'apparence', icon: <BarChart className="w-4 h-4" />, route: '/settings/appearance-settings' }
+      ]
+    },
+    {
+      id: 'workflow',
+      name: 'Workflow',
+      icon: <Workflow className="w-5 h-5" />,
+      description: 'Configuration des flux de travail automatisés',
+      items: [
+        { id: 'workflow_settings', name: 'Paramètres de workflow', icon: <Workflow className="w-4 h-4" />, route: '/settings/workflow-settings' }
+      ]
+    },
+    {
+      id: 'compliance',
+      name: 'Conformité',
+      icon: <Shield className="w-5 h-5" />,
+      description: 'Gestion de la conformité réglementaire',
+      items: [
+        { id: 'compliance_settings', name: 'Paramètres de conformité', icon: <Shield className="w-4 h-4" />, route: '/settings/compliance-settings' }
+      ]
+    },
+    {
+      id: 'import_export',
+      name: 'Import/Export',
+      icon: <FileSpreadsheet className="w-5 h-5" />,
+      description: 'Configuration des outils d\'échange de données',
+      items: [
+        { id: 'import_export_settings', name: 'Paramètres d\'import/export', icon: <FileSpreadsheet className="w-4 h-4" />, route: '/settings/import-export-settings' }
+      ]
+    },
+    {
+      id: 'calendar',
+      name: 'Calendrier',
+      icon: <Calendar className="w-5 h-5" />,
+      description: 'Configuration du système de calendrier',
+      items: [
+        { id: 'calendar_settings', name: 'Paramètres de calendrier', icon: <Calendar className="w-4 h-4" />, route: '/settings/calendar-settings' }
+      ]
+    },
+    {
+      id: 'sequences',
+      name: 'Numération',
+      icon: <Hash className="w-5 h-5" />,
+      description: 'Gestion des numéros de séquence pour les documents',
+      items: [
+        { id: 'sequences_settings', name: 'Paramètres de numération', icon: <Hash className="w-4 h-4" />, route: '/settings/sequences-settings' }
+      ]
+    },
+    {
+      id: 'performance',
+      name: 'Performance',
+      icon: <Server className="w-5 h-5" />,
+      description: 'Optimisation des performances du système',
+      items: [
+        { id: 'performance_settings', name: 'Paramètres de performance', icon: <Server className="w-4 h-4" />, route: '/settings/performance-settings' }
+      ]
     }
   ];
 

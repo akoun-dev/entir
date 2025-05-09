@@ -1,14 +1,79 @@
-/settings/database
-/settings/email
-settings/security
-settings/automation
-settings/api
-settings/logging
-/settings/apps-store
-settings/updates
-ettings/document-layouts
-settings/report-templates
-settings/printers
-settings/payment-providers
-ettings/shipping-methods
-settings/external-services
+1. Paramètres de Notifications (NotificationsSettings.tsx)
+Un système de gestion des notifications permettant de configurer :
+
+Les canaux de notification (email, SMS, notifications in-app, webhooks)
+Les modèles de notification pour différents événements
+Les préférences de notification par utilisateur ou groupe
+La planification des notifications (immédiate, différée, récurrente)
+2. Paramètres d'Audit et Traçabilité (AuditSettings.tsx)
+Une configuration pour le suivi des activités et la conformité :
+
+Niveau de détail des journaux d'audit
+Durée de conservation des données d'audit
+Événements à auditer (connexions, modifications de données sensibles, etc.)
+Rapports d'audit automatisés
+Configuration des alertes de sécurité
+3. Paramètres de Sauvegarde et Restauration (BackupSettings.tsx)
+Une interface dédiée à la gestion des sauvegardes :
+
+Planification des sauvegardes (quotidienne, hebdomadaire, mensuelle)
+Rotation des sauvegardes et politique de rétention
+Emplacements de stockage (local, cloud, multiple)
+Options de chiffrement des sauvegardes
+Interface de restauration avec historique des sauvegardes
+4. Paramètres d'Apparence et Thème (AppearanceSettings.tsx)
+Personnalisation de l'interface utilisateur :
+
+Thèmes (clair, sombre, personnalisé)
+Couleurs principales et d'accentuation
+Densité d'affichage (compact, normal, confortable)
+Options d'accessibilité (taille de police, contraste)
+Personnalisation du tableau de bord par défaut
+5. Paramètres de Workflow (WorkflowSettings.tsx)
+Configuration des flux de travail automatisés :
+
+Création et modification de workflows
+Définition des étapes et transitions
+Assignation des responsabilités
+Règles d'approbation et d'escalade
+Intégration avec les notifications
+6. Paramètres de Conformité et RGPD (ComplianceSettings.tsx)
+Gestion de la conformité réglementaire :
+
+Configuration des politiques de conservation des données
+Paramètres d'anonymisation et de pseudonymisation
+Gestion des consentements
+Journalisation des accès aux données sensibles
+Outils pour les demandes d'accès et de suppression
+7. Paramètres d'Importation/Exportation (ImportExportSettings.tsx)
+Configuration des outils d'échange de données :
+
+Formats d'importation/exportation (CSV, XML, JSON, Excel)
+Mappages de champs personnalisés
+Planification des importations/exportations automatiques
+Validation des données et gestion des erreurs
+Historique des opérations d'importation/exportation
+8. Paramètres de Calendrier et Planification (CalendarSettings.tsx)
+Configuration du système de calendrier :
+
+Jours fériés et congés par pays/région
+Heures de travail par défaut
+Fuseaux horaires
+Formats d'affichage du calendrier
+Intégration avec des calendriers externes (Google, Outlook)
+9. Paramètres de Numération et Séquences (SequenceSettings.tsx)
+Gestion des numéros de séquence pour les documents :
+
+Format des numéros de facture, commande, devis, etc.
+Préfixes et suffixes par type de document
+Séquences par année fiscale ou par période
+Réinitialisation des compteurs
+Gestion des séquences par entité/filiale
+10. Paramètres de Performance (PerformanceSettings.tsx)
+Optimisation des performances du système :
+
+Configuration du cache
+Limites de pagination et de résultats de recherche
+Planification des tâches intensives en ressources
+Optimisation des requêtes de base de données
+Surveillance des performances

@@ -1,6 +1,18 @@
 import React from 'react';
 import { Route } from 'react-router-dom';
 import SettingsLayout from '../components/layouts/SettingsLayout';
+
+// Nouveaux imports pour les composants de paramètres
+import NotificationsSettings from '../pages/settings/NotificationsSettings';
+import AuditSettings from '../pages/settings/AuditSettings';
+import BackupSettings from '../pages/settings/BackupSettings';
+import AppearanceSettings from '../pages/settings/AppearanceSettings';
+import WorkflowSettings from '../pages/settings/WorkflowSettings';
+import ComplianceSettings from '../pages/settings/ComplianceSettings';
+import ImportExportSettings from '../pages/settings/ImportExportSettings';
+import CalendarSettings from '../pages/settings/CalendarSettings';
+import SequenceSettings from '../pages/settings/SequenceSettings';
+import PerformanceSettings from '../pages/settings/PerformanceSettings';
 import CurrenciesSettings from '../pages/settings/CurrenciesSettings';
 import SettingsOverview from '../pages/settings/SettingsOverview';
 import CompanySettings from '../pages/settings/CompanySettings';
@@ -75,6 +87,36 @@ const SettingsRoutes = (
     <Route path="payment-providers" element={<PaymentProvidersSettings />} />
     <Route path="shipping-methods" element={<ShippingMethodsSettings />} />
     <Route path="external-services" element={<ExternalServicesSettings />} />
+
+    {/* Notifications */}
+    <Route path="notifications-settings" element={<NotificationsSettings />} />
+
+    {/* Audit */}
+    <Route path="audit-settings" element={<AuditSettings />} />
+
+    {/* Sauvegarde */}
+    <Route path="backup-settings" element={<BackupSettings />} />
+
+    {/* Apparence */}
+    <Route path="appearance-settings" element={<AppearanceSettings />} />
+
+    {/* Workflow */}
+    <Route path="workflow-settings" element={<WorkflowSettings />} />
+
+    {/* Conformité */}
+    <Route path="compliance-settings" element={<ComplianceSettings />} />
+
+    {/* Import/Export */}
+    <Route path="import-export-settings" element={<ImportExportSettings />} />
+
+    {/* Calendrier */}
+    <Route path="calendar-settings" element={<CalendarSettings />} />
+
+    {/* Numération */}
+    <Route path="sequences-settings" element={<SequenceSettings />} />
+
+    {/* Performance */}
+    <Route path="performance-settings" element={<PerformanceSettings />} />
   </Route>
 );
 
