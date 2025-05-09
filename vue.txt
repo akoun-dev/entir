@@ -1,0 +1,14 @@
+/settings/database
+/settings/email
+settings/security
+settings/automation
+settings/api
+settings/logging
+/settings/apps-store
+settings/updates
+ettings/document-layouts
+settings/report-templates
+settings/printers
+settings/payment-providers
+ettings/shipping-methods
+settings/external-services

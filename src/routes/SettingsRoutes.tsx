@@ -5,165 +5,30 @@ import CurrenciesSettings from '../pages/settings/CurrenciesSettings';
 import SettingsOverview from '../pages/settings/SettingsOverview';
 import CompanySettings from '../pages/settings/CompanySettings';
 import ModulesListSettings from '../pages/settings/ModulesListSettings';
+import UsersSettings from '../pages/settings/UsersSettings';
+import GroupsSettings from '../pages/settings/GroupsSettings';
+import LanguagesSettings from '../pages/settings/LanguagesSettings';
+import CountriesSettings from '../pages/settings/CountriesSettings';
+import TranslationsSettings from '../pages/settings/TranslationsSettings';
+import DateFormatsSettings from '../pages/settings/DateFormatsSettings';
+import TimeFormatsSettings from '../pages/settings/TimeFormatsSettings';
+import NumberFormatsSettings from '../pages/settings/NumberFormatsSettings';
 
-// Composants temporaires pour les pages de paramètres qui n'existent pas encore
-const UsersSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Gestion des utilisateurs</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const GroupsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Groupes d'utilisateurs</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const LanguagesSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Langues</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const CountriesSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Pays</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const TranslationsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Traductions</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const DateFormatsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Formats de date</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const TimeFormatsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Formats d'heure</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const NumberFormatsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Formats de nombre</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-// Composants pour les paramètres techniques
-const DatabaseSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Base de données</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const EmailSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Serveurs de messagerie</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const SecuritySettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Sécurité</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const AutomationSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Actions automatisées</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const ApiSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">API & Intégrations</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const LoggingSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Journalisation</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-// Composants pour la gestion des modules
-const AppsStoreSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Boutique d'applications</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const UpdatesSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Mises à jour</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-// Composants pour la gestion des documents
-const DocumentLayoutsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Mise en page des documents</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const ReportTemplatesSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Modèles de rapport</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const PrintersSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Imprimantes</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-// Composants pour les intégrations
-const PaymentProvidersSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Fournisseurs de paiement</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const ShippingMethodsSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Méthodes d'expédition</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
-
-const ExternalServicesSettings = () => (
-  <div className="container mx-auto px-4 py-6">
-    <h1 className="text-3xl font-bold tracking-tight mb-4">Services externes</h1>
-    <p className="text-muted-foreground">Cette page est en cours de développement.</p>
-  </div>
-);
+// Import des composants de paramètres
+import DatabaseSettings from '../pages/settings/DatabaseSettings';
+import EmailSettings from '../pages/settings/EmailSettings';
+import SecuritySettings from '../pages/settings/SecuritySettings';
+import AutomationSettings from '../pages/settings/AutomationSettings';
+import ApiSettings from '../pages/settings/ApiSettings';
+import LoggingSettings from '../pages/settings/LoggingSettings';
+import AppsStoreSettings from '../pages/settings/AppsStoreSettings';
+import UpdatesSettings from '../pages/settings/UpdatesSettings';
+import DocumentLayoutsSettings from '../pages/settings/DocumentLayoutsSettings';
+import ReportTemplatesSettings from '../pages/settings/ReportTemplatesSettings';
+import PrintersSettings from '../pages/settings/PrintersSettings';
+import PaymentProvidersSettings from '../pages/settings/PaymentProvidersSettings';
+import ShippingMethodsSettings from '../pages/settings/ShippingMethodsSettings';
+import ExternalServicesSettings from '../pages/settings/ExternalServicesSettings';
 
 /**
  * Routes pour la section des paramètres de l'application

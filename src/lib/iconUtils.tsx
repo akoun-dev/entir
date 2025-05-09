@@ -25,7 +25,25 @@ import {
   FileSpreadsheet,
   PieChart,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  UserPlus,
+  Target,
+  Calendar,
+  FolderKanban,
+  CheckSquare,
+  Clock,
+  Hash,
+  Globe,
+  Languages,
+  Search,
+  Plus,
+  Pencil,
+  Trash2,
+  Check,
+  Info,
+  Shield,
+  Mail,
+  Lock
 } from 'lucide-react';
 
 /**
@@ -50,7 +68,7 @@ export const getIconComponent = (iconName?: string, className: string = 'w-5 h-5
     case 'Settings':
     case 'SettingsIcon':
       return <Settings {...props} />;
-      
+
     // Icônes RH
     case 'User':
     case 'UserIcon':
@@ -75,7 +93,7 @@ export const getIconComponent = (iconName?: string, className: string = 'w-5 h-5
     case 'Briefcase':
     case 'BriefcaseIcon':
       return <Briefcase {...props} />;
-      
+
     // Icônes Finance
     case 'BarChart':
     case 'BarChartIcon':
@@ -98,7 +116,7 @@ export const getIconComponent = (iconName?: string, className: string = 'w-5 h-5
     case 'TrendingUp':
     case 'TrendingUpIcon':
       return <TrendingUp {...props} />;
-      
+
     // Icônes Inventaire/Logistique
     case 'Package':
     case 'PackageIcon':
@@ -115,7 +133,7 @@ export const getIconComponent = (iconName?: string, className: string = 'w-5 h-5
     case 'Warehouse':
     case 'WarehouseIcon':
       return <Warehouse {...props} />;
-      
+
     // Icônes Documents
     case 'Clipboard':
     case 'ClipboardIcon':
@@ -129,7 +147,63 @@ export const getIconComponent = (iconName?: string, className: string = 'w-5 h-5
     case 'Folder':
     case 'FolderIcon':
       return <Folder {...props} />;
-      
+
+    // Icônes pour les paramètres
+    case 'UserPlus':
+    case 'UserPlusIcon':
+      return <UserPlus {...props} />;
+    case 'Target':
+    case 'TargetIcon':
+      return <Target {...props} />;
+    case 'Calendar':
+    case 'CalendarIcon':
+      return <Calendar {...props} />;
+    case 'FolderKanban':
+    case 'FolderKanbanIcon':
+      return <FolderKanban {...props} />;
+    case 'CheckSquare':
+    case 'CheckSquareIcon':
+      return <CheckSquare {...props} />;
+    case 'Clock':
+    case 'ClockIcon':
+      return <Clock {...props} />;
+    case 'Hash':
+    case 'HashIcon':
+      return <Hash {...props} />;
+    case 'Globe':
+    case 'GlobeIcon':
+      return <Globe {...props} />;
+    case 'Languages':
+    case 'LanguagesIcon':
+      return <Languages {...props} />;
+    case 'Search':
+    case 'SearchIcon':
+      return <Search {...props} />;
+    case 'Plus':
+    case 'PlusIcon':
+      return <Plus {...props} />;
+    case 'Pencil':
+    case 'PencilIcon':
+      return <Pencil {...props} />;
+    case 'Trash2':
+    case 'Trash2Icon':
+      return <Trash2 {...props} />;
+    case 'Check':
+    case 'CheckIcon':
+      return <Check {...props} />;
+    case 'Info':
+    case 'InfoIcon':
+      return <Info {...props} />;
+    case 'Shield':
+    case 'ShieldIcon':
+      return <Shield {...props} />;
+    case 'Mail':
+    case 'MailIcon':
+      return <Mail {...props} />;
+    case 'Lock':
+    case 'LockIcon':
+      return <Lock {...props} />;
+
     // Fallback
     default:
       console.warn(`Icône non trouvée: ${iconName}`);
