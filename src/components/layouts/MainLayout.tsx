@@ -24,7 +24,7 @@ const MainLayout: React.FC = () => {
         />
         <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-16'}`}>
           <Header toggleSidebar={() => setSidebarOpen(prev => !prev)} isSidebarOpen={sidebarOpen} />
-          <div className="container mx-auto px-4 py-6 transition-all">
+          <div className="w-full transition-all">
             <Outlet />
           </div>
         </main>

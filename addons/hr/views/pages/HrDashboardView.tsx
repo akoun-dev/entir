@@ -22,7 +22,7 @@ import {
   Briefcase,      // Added missing import for Briefcase
   LayoutDashboard // Added missing import for LayoutDashboard
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '../../../../src/components/ui/avatar';
+import { Avatar, AvatarFallback } from '../../../../src/components/ui/avatar';
 import { Badge } from '../../../../src/components/ui/badge';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -134,10 +134,10 @@ const HrDashboardView: React.FC = () => {
 
   return (
     <HrLayout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* En-tête avec fil d'Ariane */}
         <div className="mb-6">
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex items-center gap-3">
             <div className="h-6 w-1.5 bg-amber-500 rounded-full"></div>
             <LayoutDashboard className="h-6 w-6 text-amber-500" />
             <h1 className="text-2xl font-bold">Tableau de Bord RH</h1>
@@ -425,7 +425,7 @@ const HrDashboardView: React.FC = () => {
                 {upcomingEvents.map((event) => {
                   // Choisir la couleur selon le type d'événement
                   let badgeClass = '';
-                  let icon = null;
+                  let icon: React.ReactNode = null;
 
                   switch(event.type) {
                     case 'meeting':

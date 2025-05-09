@@ -203,7 +203,7 @@ const ContractsView: React.FC = () => {
 
   return (
     <HrLayout>
-      <div>
+      <div className="w-full">
         {/* En-tête avec fil d'Ariane */}
         <div className="mb-6">
           <Breadcrumb>
@@ -226,9 +226,9 @@ const ContractsView: React.FC = () => {
         </div>
 
         {/* Barre d'actions */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 mt-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2 mt-4">
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
+            <div className="relative flex-1 md:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher un contrat..."

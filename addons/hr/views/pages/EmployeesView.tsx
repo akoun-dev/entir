@@ -30,7 +30,7 @@ const EmployeesView: React.FC = () => {
 
   return (
     <HrLayout>
-      <div>
+      <div className="w-full">
         {/* En-tête avec actions */}
         <EmployeeViewHeader />
 

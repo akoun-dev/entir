@@ -40,7 +40,7 @@ export const HrLayout: React.FC<HrLayoutProps> = ({ children, showMenu = true })
   const { header, content } = extractHeaderAndContent();
 
   return (
-    <div className="container mx-auto px-4 py-6 adinkra-bg space-y-6">
+    <div className="w-full adinkra-bg space-y-4 px-4 py-4">
       {/* En-tête (s'il existe) */}
       {header}
 
