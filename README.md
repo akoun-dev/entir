@@ -89,7 +89,7 @@ Ce projet est construit avec :
 
 ```sh
 # Cloner le dépôt
-git clone <https://github.com/akoun-dev/entir.git>
+git clone https://github.com/akoun-dev/entir.git
 
 # Naviguer vers le répertoire du projet
 cd ENTIDR
