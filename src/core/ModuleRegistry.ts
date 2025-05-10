@@ -1,6 +1,6 @@
 /**
  * Registre des modules de l'application
- * 
+ *
  * ATTENTION: Ce fichier est généré automatiquement par le script generateModuleRegistry.js
  * Ne pas modifier manuellement ce fichier, il sera écrasé à la prochaine génération.
  */
@@ -56,7 +56,7 @@ export const getAllModules = async (): Promise<Addon[]> => {
   const modulePromises = AVAILABLE_MODULE_NAMES.map(async (name) => {
     const module = await loadModule(name);
     if (!module) return null;
-    
+
     // Vérifier que le module a un manifeste et des routes
     if (!module.manifest || !module.routes) {
       console.warn(`Le module ${name} n'a pas de manifeste ou de routes définis.`);

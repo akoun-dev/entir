@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Button } from '../../components/ui/button';
@@ -8,8 +8,10 @@ import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Clock, Search, Plus, Pencil, Trash2, Check, Info } from 'lucide-react';
+import { Clock, Search, Plus, Pencil, Trash2, Check, Info, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { useToast } from '../../components/ui/use-toast';
+import { timeFormatService, type TimeFormat as ApiTimeFormat } from '../../services/api';
 
 // Types pour les formats d'heure
 interface TimeFormat {
@@ -22,13 +24,40 @@ interface TimeFormat {
   uses24Hour: boolean;
 }
 
+// Fonction pour convertir le format d'API en format local
+const apiToLocalTimeFormat = (apiFormat: ApiTimeFormat): TimeFormat => ({
+  id: apiFormat.id,
+  name: apiFormat.name,
+  format: apiFormat.format,
+  example: apiFormat.example,
+  isDefault: apiFormat.is_default,
+  region: apiFormat.region,
+  uses24Hour: apiFormat.uses_24_hour
+});
+
+// Fonction pour convertir le format local en format d'API
+const localToApiTimeFormat = (localFormat: TimeFormat): Omit<ApiTimeFormat, 'id'> => ({
+  name: localFormat.name,
+  format: localFormat.format,
+  example: localFormat.example,
+  is_default: localFormat.isDefault,
+  region: localFormat.region,
+  uses_24_hour: localFormat.uses24Hour,
+  active: true
+});
+
 /**
  * Page des paramètres des formats d'heure
  * Permet de gérer les formats d'heure disponibles dans l'application
  */
 const TimeFormatsSettings: React.FC = () => {
+  const { toast } = useToast();
+
   // Obtenir l'heure actuelle pour les exemples
   const currentTime = new Date();
+
+  // État pour le chargement
+  const [loading, setLoading] = useState(true);
 
   // Fonction pour formater une heure selon un format spécifié
   const formatTime = (format: string, uses24Hour: boolean): string => {
@@ -57,53 +86,59 @@ const TimeFormatsSettings: React.FC = () => {
   };
 
   // État pour les formats d'heure
-  const [timeFormats, setTimeFormats] = useState<TimeFormat[]>([
-    {
-      id: '1',
-      name: '24 heures avec secondes',
-      format: 'HH:mm:ss',
-      example: formatTime('HH:mm:ss', true),
-      isDefault: true,
-      region: 'Europe',
-      uses24Hour: true
-    },
-    {
-      id: '2',
-      name: '24 heures sans secondes',
-      format: 'HH:mm',
-      example: formatTime('HH:mm', true),
-      isDefault: false,
-      region: 'Europe',
-      uses24Hour: true
-    },
-    {
-      id: '3',
-      name: '12 heures avec AM/PM',
-      format: 'HH:mm a',
-      example: formatTime('HH:mm a', false),
-      isDefault: false,
-      region: 'Amérique du Nord',
-      uses24Hour: false
-    },
-    {
-      id: '4',
-      name: '12 heures avec secondes et AM/PM',
-      format: 'HH:mm:ss a',
-      example: formatTime('HH:mm:ss a', false),
-      isDefault: false,
-      region: 'Amérique du Nord',
-      uses24Hour: false
-    },
-    {
-      id: '5',
-      name: 'Format militaire',
-      format: 'HHmm',
-      example: formatTime('HHmm', true),
-      isDefault: false,
-      region: 'International',
-      uses24Hour: true
-    }
-  ]);
+  const [timeFormats, setTimeFormats] = useState<TimeFormat[]>([]);
+
+  // Charger les formats d'heure depuis l'API
+  useEffect(() => {
+    const fetchTimeFormats = async () => {
+      try {
+        setLoading(true);
+        const apiFormats = await timeFormatService.getAll();
+        setTimeFormats(apiFormats.map(apiToLocalTimeFormat));
+      } catch (error) {
+        console.error('Erreur lors du chargement des formats d\'heure:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les formats d\'heure',
+          variant: 'destructive'
+        });
+        // Charger des données par défaut en cas d'erreur
+        setTimeFormats([
+          {
+            id: '1',
+            name: '24 heures avec secondes',
+            format: 'HH:mm:ss',
+            example: formatTime('HH:mm:ss', true),
+            isDefault: true,
+            region: 'Europe',
+            uses24Hour: true
+          },
+          {
+            id: '2',
+            name: '24 heures sans secondes',
+            format: 'HH:mm',
+            example: formatTime('HH:mm', true),
+            isDefault: false,
+            region: 'Europe',
+            uses24Hour: true
+          },
+          {
+            id: '3',
+            name: '12 heures avec AM/PM',
+            format: 'HH:mm a',
+            example: formatTime('HH:mm a', false),
+            isDefault: false,
+            region: 'Amérique du Nord',
+            uses24Hour: false
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTimeFormats();
+  }, [toast]);
 
   // Régions disponibles
   const regions = ['Europe', 'Amérique du Nord', 'Amérique du Sud', 'Asie', 'Afrique', 'Océanie', 'International'];
@@ -128,61 +163,140 @@ const TimeFormatsSettings: React.FC = () => {
   });
 
   // Gérer l'ajout ou la modification d'un format d'heure
-  const handleSaveTimeFormat = (timeFormat: TimeFormat) => {
-    // Si le nouveau format est défini comme par défaut, mettre à jour tous les autres formats
-    const updatedTimeFormat = {
-      ...timeFormat,
-      example: formatTime(timeFormat.format, timeFormat.uses24Hour)
-    };
+  const handleSaveTimeFormat = async (timeFormat: TimeFormat) => {
+    try {
+      setLoading(true);
 
-    if (updatedTimeFormat.isDefault) {
-      const updatedFormats = timeFormats.map(format => ({
-        ...format,
-        isDefault: format.id === updatedTimeFormat.id
-      }));
+      // Préparer le format d'heure avec l'exemple mis à jour
+      const updatedTimeFormat = {
+        ...timeFormat,
+        example: formatTime(timeFormat.format, timeFormat.uses24Hour)
+      };
+
+      // Convertir le format local en format API
+      const apiTimeFormat = localToApiTimeFormat(updatedTimeFormat);
 
       if (editingTimeFormat) {
         // Mise à jour d'un format existant
-        setTimeFormats(updatedFormats);
-      } else {
-        // Ajout d'un nouveau format
-        setTimeFormats([...updatedFormats, { ...updatedTimeFormat, id: String(timeFormats.length + 1) }]);
-      }
-    } else {
-      if (editingTimeFormat) {
-        // Mise à jour d'un format existant sans changer le statut par défaut des autres
-        setTimeFormats(timeFormats.map(format =>
-          format.id === updatedTimeFormat.id ? updatedTimeFormat : format
-        ));
-      } else {
-        // Ajout d'un nouveau format
-        setTimeFormats([...timeFormats, { ...updatedTimeFormat, id: String(timeFormats.length + 1) }]);
-      }
-    }
+        const updatedFormat = await timeFormatService.update(timeFormat.id, apiTimeFormat);
 
-    setIsDialogOpen(false);
-    setEditingTimeFormat(null);
+        // Si le format est défini comme par défaut, mettre à jour la liste locale
+        if (updatedTimeFormat.isDefault && !editingTimeFormat.isDefault) {
+          // Mettre à jour le statut par défaut via l'API
+          await timeFormatService.setDefault(timeFormat.id);
+        }
+
+        // Mettre à jour la liste locale
+        setTimeFormats(timeFormats.map(format =>
+          format.id === timeFormat.id ? apiToLocalTimeFormat(updatedFormat) : format
+        ));
+
+        toast({
+          title: 'Format d\'heure mis à jour',
+          description: 'Le format d\'heure a été mis à jour avec succès',
+          variant: 'default'
+        });
+      } else {
+        // Ajout d'un nouveau format
+        const newFormat = await timeFormatService.create(apiTimeFormat);
+
+        // Si le format est défini comme par défaut, mettre à jour le statut par défaut via l'API
+        if (updatedTimeFormat.isDefault) {
+          await timeFormatService.setDefault(newFormat.id);
+        }
+
+        // Ajouter le nouveau format à la liste locale
+        setTimeFormats([...timeFormats, apiToLocalTimeFormat(newFormat)]);
+
+        toast({
+          title: 'Format d\'heure ajouté',
+          description: 'Le format d\'heure a été ajouté avec succès',
+          variant: 'default'
+        });
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement du format d\'heure:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'enregistrer le format d\'heure',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+      setIsDialogOpen(false);
+      setEditingTimeFormat(null);
+    }
   };
 
   // Gérer la suppression d'un format d'heure
-  const handleDeleteTimeFormat = (id: string) => {
-    // Vérifier si le format à supprimer est le format par défaut
-    const formatToDelete = timeFormats.find(format => format.id === id);
+  const handleDeleteTimeFormat = async (id: string) => {
+    try {
+      // Vérifier si le format à supprimer est le format par défaut
+      const formatToDelete = timeFormats.find(format => format.id === id);
 
-    if (formatToDelete?.isDefault) {
-      alert('Vous ne pouvez pas supprimer le format par défaut. Veuillez d\'abord définir un autre format comme format par défaut.');
-      return;
+      if (formatToDelete?.isDefault) {
+        toast({
+          title: 'Action impossible',
+          description: 'Vous ne pouvez pas supprimer le format par défaut. Veuillez d\'abord définir un autre format comme format par défaut.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setLoading(true);
+
+      // Supprimer le format via l'API
+      await timeFormatService.delete(id);
+
+      // Mettre à jour la liste locale
+      setTimeFormats(timeFormats.filter(format => format.id !== id));
+
+      toast({
+        title: 'Format d\'heure supprimé',
+        description: 'Le format d\'heure a été supprimé avec succès',
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors de la suppression du format d\'heure:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de supprimer le format d\'heure',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
-
-    setTimeFormats(timeFormats.filter(format => format.id !== id));
   };
 
   // Gérer le changement de format par défaut
-  const handleSetDefaultTimeFormat = (id: string) => {
-    setTimeFormats(timeFormats.map(format => ({
-      ...format,
-      isDefault: format.id === id
-    })));
+  const handleSetDefaultTimeFormat = async (id: string) => {
+    try {
+      setLoading(true);
+
+      // Définir le format comme format par défaut via l'API
+      await timeFormatService.setDefault(id);
+
+      // Mettre à jour la liste locale
+      setTimeFormats(timeFormats.map(format => ({
+        ...format,
+        isDefault: format.id === id
+      })));
+
+      toast({
+        title: 'Format par défaut mis à jour',
+        description: 'Le format d\'heure par défaut a été mis à jour avec succès',
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors de la définition du format par défaut:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de définir le format par défaut',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -283,7 +397,23 @@ const TimeFormatsSettings: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTimeFormats.map((timeFormat) => (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      <div className="flex justify-center items-center">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span>Chargement des formats d'heure...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredTimeFormats.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      Aucun format d'heure trouvé.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTimeFormats.map((timeFormat) => (
                   <TableRow key={timeFormat.id}>
                     <TableCell className="font-medium">{timeFormat.name}</TableCell>
                     <TableCell>
@@ -347,7 +477,8 @@ const TimeFormatsSettings: React.FC = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

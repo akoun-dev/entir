@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Button } from '../../components/ui/button';
@@ -8,8 +8,10 @@ import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Hash, Search, Plus, Pencil, Trash2, Check, Info } from 'lucide-react';
+import { Hash, Search, Plus, Pencil, Trash2, Check, Info, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { useToast } from '../../components/ui/use-toast';
+import { numberFormatService, type NumberFormat as ApiNumberFormat } from '../../services/api';
 
 // Types pour les formats de nombre
 interface NumberFormat {
@@ -26,11 +28,42 @@ interface NumberFormat {
   region: string;
 }
 
+// Fonction pour convertir le format d'API en format local
+const apiToLocalNumberFormat = (apiFormat: ApiNumberFormat): NumberFormat => ({
+  id: apiFormat.id,
+  name: apiFormat.name,
+  decimalSeparator: apiFormat.decimal_separator,
+  thousandsSeparator: apiFormat.thousands_separator || '',
+  decimalPlaces: apiFormat.decimal_places,
+  currencySymbol: '€', // Valeur par défaut, à ajuster selon les besoins
+  currencyPosition: 'after', // Valeur par défaut, à ajuster selon les besoins
+  example: '', // Sera calculé lors du rendu
+  exampleCurrency: '', // Sera calculé lors du rendu
+  isDefault: apiFormat.is_default,
+  region: 'Europe' // Valeur par défaut, à ajuster selon les besoins
+});
+
+// Fonction pour convertir le format local en format API
+const localToApiNumberFormat = (localFormat: NumberFormat): Omit<ApiNumberFormat, 'id'> => ({
+  name: localFormat.name,
+  decimal_separator: localFormat.decimalSeparator,
+  thousands_separator: localFormat.thousandsSeparator,
+  decimal_places: localFormat.decimalPlaces,
+  currency_display: 'symbol', // Valeur par défaut, à ajuster selon les besoins
+  is_default: localFormat.isDefault,
+  active: true
+});
+
 /**
  * Page des paramètres des formats de nombre
  * Permet de gérer les formats de nombre disponibles dans l'application
  */
 const NumberFormatsSettings: React.FC = () => {
+  const { toast } = useToast();
+
+  // État pour le chargement
+  const [loading, setLoading] = useState(true);
+
   // Fonction pour formater un nombre selon un format spécifié
   const formatNumber = (
     decimalSeparator: string,
@@ -71,73 +104,93 @@ const NumberFormatsSettings: React.FC = () => {
   };
 
   // État pour les formats de nombre
-  const [numberFormats, setNumberFormats] = useState<NumberFormat[]>([
-    {
-      id: '1',
-      name: 'Standard français',
-      decimalSeparator: ',',
-      thousandsSeparator: ' ',
-      decimalPlaces: 2,
-      currencySymbol: '€',
-      currencyPosition: 'after',
-      example: formatNumber(',', ' ', 2, '€', 'after').number,
-      exampleCurrency: formatNumber(',', ' ', 2, '€', 'after').currency,
-      isDefault: true,
-      region: 'Europe'
-    },
-    {
-      id: '2',
-      name: 'Standard américain',
-      decimalSeparator: '.',
-      thousandsSeparator: ',',
-      decimalPlaces: 2,
-      currencySymbol: '$',
-      currencyPosition: 'before',
-      example: formatNumber('.', ',', 2, '$', 'before').number,
-      exampleCurrency: formatNumber('.', ',', 2, '$', 'before').currency,
-      isDefault: false,
-      region: 'Amérique du Nord'
-    },
-    {
-      id: '3',
-      name: 'Standard britannique',
-      decimalSeparator: '.',
-      thousandsSeparator: ',',
-      decimalPlaces: 2,
-      currencySymbol: '£',
-      currencyPosition: 'before',
-      example: formatNumber('.', ',', 2, '£', 'before').number,
-      exampleCurrency: formatNumber('.', ',', 2, '£', 'before').currency,
-      isDefault: false,
-      region: 'Europe'
-    },
-    {
-      id: '4',
-      name: 'Standard allemand',
-      decimalSeparator: ',',
-      thousandsSeparator: '.',
-      decimalPlaces: 2,
-      currencySymbol: '€',
-      currencyPosition: 'after',
-      example: formatNumber(',', '.', 2, '€', 'after').number,
-      exampleCurrency: formatNumber(',', '.', 2, '€', 'after').currency,
-      isDefault: false,
-      region: 'Europe'
-    },
-    {
-      id: '5',
-      name: 'Standard indien',
-      decimalSeparator: '.',
-      thousandsSeparator: ',',
-      decimalPlaces: 2,
-      currencySymbol: '₹',
-      currencyPosition: 'before',
-      example: formatNumber('.', ',', 2, '₹', 'before').number,
-      exampleCurrency: formatNumber('.', ',', 2, '₹', 'before').currency,
-      isDefault: false,
-      region: 'Asie'
-    }
-  ]);
+  const [numberFormats, setNumberFormats] = useState<NumberFormat[]>([]);
+
+  // Charger les formats de nombre depuis l'API
+  useEffect(() => {
+    const fetchNumberFormats = async () => {
+      try {
+        setLoading(true);
+        const apiFormats = await numberFormatService.getAll();
+
+        // Convertir les formats API en formats locaux et calculer les exemples
+        const localFormats = apiFormats.map(apiFormat => {
+          const localFormat = apiToLocalNumberFormat(apiFormat);
+
+          // Calculer les exemples
+          const examples = formatNumber(
+            localFormat.decimalSeparator,
+            localFormat.thousandsSeparator,
+            localFormat.decimalPlaces,
+            localFormat.currencySymbol,
+            localFormat.currencyPosition
+          );
+
+          return {
+            ...localFormat,
+            example: examples.number,
+            exampleCurrency: examples.currency
+          };
+        });
+
+        setNumberFormats(localFormats);
+      } catch (error) {
+        console.error('Erreur lors du chargement des formats de nombre:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les formats de nombre',
+          variant: 'destructive'
+        });
+
+        // Charger des données par défaut en cas d'erreur
+        setNumberFormats([
+          {
+            id: '1',
+            name: 'Standard français',
+            decimalSeparator: ',',
+            thousandsSeparator: ' ',
+            decimalPlaces: 2,
+            currencySymbol: '€',
+            currencyPosition: 'after',
+            example: formatNumber(',', ' ', 2, '€', 'after').number,
+            exampleCurrency: formatNumber(',', ' ', 2, '€', 'after').currency,
+            isDefault: true,
+            region: 'Europe'
+          },
+          {
+            id: '2',
+            name: 'Standard américain',
+            decimalSeparator: '.',
+            thousandsSeparator: ',',
+            decimalPlaces: 2,
+            currencySymbol: '$',
+            currencyPosition: 'before',
+            example: formatNumber('.', ',', 2, '$', 'before').number,
+            exampleCurrency: formatNumber('.', ',', 2, '$', 'before').currency,
+            isDefault: false,
+            region: 'Amérique du Nord'
+          },
+          {
+            id: '3',
+            name: 'Standard britannique',
+            decimalSeparator: '.',
+            thousandsSeparator: ',',
+            decimalPlaces: 2,
+            currencySymbol: '£',
+            currencyPosition: 'before',
+            example: formatNumber('.', ',', 2, '£', 'before').number,
+            exampleCurrency: formatNumber('.', ',', 2, '£', 'before').currency,
+            isDefault: false,
+            region: 'Europe'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNumberFormats();
+  }, [toast]);
 
   // Régions disponibles
   const regions = ['Europe', 'Amérique du Nord', 'Amérique du Sud', 'Asie', 'Afrique', 'Océanie', 'International'];
@@ -165,73 +218,168 @@ const NumberFormatsSettings: React.FC = () => {
   });
 
   // Gérer l'ajout ou la modification d'un format de nombre
-  const handleSaveNumberFormat = (numberFormat: NumberFormat) => {
-    // Générer les exemples
-    const examples = formatNumber(
-      numberFormat.decimalSeparator,
-      numberFormat.thousandsSeparator,
-      numberFormat.decimalPlaces,
-      numberFormat.currencySymbol,
-      numberFormat.currencyPosition
-    );
+  const handleSaveNumberFormat = async (numberFormat: NumberFormat) => {
+    try {
+      setLoading(true);
 
-    const updatedNumberFormat = {
-      ...numberFormat,
-      example: examples.number,
-      exampleCurrency: examples.currency
-    };
+      // Générer les exemples
+      const examples = formatNumber(
+        numberFormat.decimalSeparator,
+        numberFormat.thousandsSeparator,
+        numberFormat.decimalPlaces,
+        numberFormat.currencySymbol,
+        numberFormat.currencyPosition
+      );
 
-    // Si le nouveau format est défini comme par défaut, mettre à jour tous les autres formats
-    if (updatedNumberFormat.isDefault) {
-      const updatedFormats = numberFormats.map(format => ({
-        ...format,
-        isDefault: format.id === updatedNumberFormat.id
-      }));
+      const updatedNumberFormat = {
+        ...numberFormat,
+        example: examples.number,
+        exampleCurrency: examples.currency
+      };
+
+      // Convertir le format local en format API
+      const apiNumberFormat = localToApiNumberFormat(updatedNumberFormat);
 
       if (editingNumberFormat) {
         // Mise à jour d'un format existant
-        setNumberFormats(updatedFormats.map(format =>
-          format.id === updatedNumberFormat.id ? updatedNumberFormat : format
-        ));
-      } else {
-        // Ajout d'un nouveau format
-        setNumberFormats([...updatedFormats, { ...updatedNumberFormat, id: String(numberFormats.length + 1) }]);
-      }
-    } else {
-      if (editingNumberFormat) {
-        // Mise à jour d'un format existant sans changer le statut par défaut des autres
-        setNumberFormats(numberFormats.map(format =>
-          format.id === updatedNumberFormat.id ? updatedNumberFormat : format
-        ));
-      } else {
-        // Ajout d'un nouveau format
-        setNumberFormats([...numberFormats, { ...updatedNumberFormat, id: String(numberFormats.length + 1) }]);
-      }
-    }
+        const updatedFormat = await numberFormatService.update(numberFormat.id, apiNumberFormat);
 
-    setIsDialogOpen(false);
-    setEditingNumberFormat(null);
+        // Si le format est défini comme par défaut, mettre à jour le statut par défaut via l'API
+        if (updatedNumberFormat.isDefault && !editingNumberFormat.isDefault) {
+          await numberFormatService.setDefault(numberFormat.id);
+        }
+
+        // Mettre à jour la liste locale
+        const updatedLocalFormat = apiToLocalNumberFormat(updatedFormat);
+        const updatedWithExamples = {
+          ...updatedLocalFormat,
+          example: examples.number,
+          exampleCurrency: examples.currency,
+          currencySymbol: numberFormat.currencySymbol,
+          currencyPosition: numberFormat.currencyPosition,
+          region: numberFormat.region
+        };
+
+        setNumberFormats(numberFormats.map(format =>
+          format.id === numberFormat.id ? updatedWithExamples : format
+        ));
+
+        toast({
+          title: 'Format de nombre mis à jour',
+          description: 'Le format de nombre a été mis à jour avec succès',
+          variant: 'default'
+        });
+      } else {
+        // Ajout d'un nouveau format
+        const newFormat = await numberFormatService.create(apiNumberFormat);
+
+        // Si le format est défini comme par défaut, mettre à jour le statut par défaut via l'API
+        if (updatedNumberFormat.isDefault) {
+          await numberFormatService.setDefault(newFormat.id);
+        }
+
+        // Ajouter le nouveau format à la liste locale
+        const newLocalFormat = apiToLocalNumberFormat(newFormat);
+        const newWithExamples = {
+          ...newLocalFormat,
+          example: examples.number,
+          exampleCurrency: examples.currency,
+          currencySymbol: numberFormat.currencySymbol,
+          currencyPosition: numberFormat.currencyPosition,
+          region: numberFormat.region
+        };
+
+        setNumberFormats([...numberFormats, newWithExamples]);
+
+        toast({
+          title: 'Format de nombre ajouté',
+          description: 'Le format de nombre a été ajouté avec succès',
+          variant: 'default'
+        });
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement du format de nombre:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'enregistrer le format de nombre',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+      setIsDialogOpen(false);
+      setEditingNumberFormat(null);
+    }
   };
 
   // Gérer la suppression d'un format de nombre
-  const handleDeleteNumberFormat = (id: string) => {
-    // Vérifier si le format à supprimer est le format par défaut
-    const formatToDelete = numberFormats.find(format => format.id === id);
+  const handleDeleteNumberFormat = async (id: string) => {
+    try {
+      // Vérifier si le format à supprimer est le format par défaut
+      const formatToDelete = numberFormats.find(format => format.id === id);
 
-    if (formatToDelete?.isDefault) {
-      alert('Vous ne pouvez pas supprimer le format par défaut. Veuillez d\'abord définir un autre format comme format par défaut.');
-      return;
+      if (formatToDelete?.isDefault) {
+        toast({
+          title: 'Action impossible',
+          description: 'Vous ne pouvez pas supprimer le format par défaut. Veuillez d\'abord définir un autre format comme format par défaut.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setLoading(true);
+
+      // Supprimer le format via l'API
+      await numberFormatService.delete(id);
+
+      // Mettre à jour la liste locale
+      setNumberFormats(numberFormats.filter(format => format.id !== id));
+
+      toast({
+        title: 'Format de nombre supprimé',
+        description: 'Le format de nombre a été supprimé avec succès',
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors de la suppression du format de nombre:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de supprimer le format de nombre',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
     }
-
-    setNumberFormats(numberFormats.filter(format => format.id !== id));
   };
 
   // Gérer le changement de format par défaut
-  const handleSetDefaultNumberFormat = (id: string) => {
-    setNumberFormats(numberFormats.map(format => ({
-      ...format,
-      isDefault: format.id === id
-    })));
+  const handleSetDefaultNumberFormat = async (id: string) => {
+    try {
+      setLoading(true);
+
+      // Définir le format comme format par défaut via l'API
+      await numberFormatService.setDefault(id);
+
+      // Mettre à jour la liste locale
+      setNumberFormats(numberFormats.map(format => ({
+        ...format,
+        isDefault: format.id === id
+      })));
+
+      toast({
+        title: 'Format par défaut mis à jour',
+        description: 'Le format de nombre par défaut a été mis à jour avec succès',
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors de la définition du format par défaut:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de définir le format par défaut',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -339,7 +487,23 @@ const NumberFormatsSettings: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredNumberFormats.map((numberFormat) => (
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center">
+                      <div className="flex justify-center items-center">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span>Chargement des formats de nombre...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredNumberFormats.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center">
+                      Aucun format de nombre trouvé.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredNumberFormats.map((numberFormat) => (
                   <TableRow key={numberFormat.id}>
                     <TableCell className="font-medium">{numberFormat.name}</TableCell>
                     <TableCell>
@@ -414,7 +578,8 @@ const NumberFormatsSettings: React.FC = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Button } from '../../components/ui/button';
@@ -8,17 +8,21 @@ import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Calendar, Search, Plus, Pencil, Trash2, Check, Info } from 'lucide-react';
+import { Calendar, Search, Plus, Pencil, Trash2, Check, Info, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { useToast } from '../../components/ui/use-toast';
+import { dateFormatService, DateFormat as ApiDateFormat } from '../../services/api';
 
 // Types pour les formats de date
 interface DateFormat {
   id: string;
   name: string;
   format: string;
-  example: string;
-  isDefault: boolean;
-  region: string;
+  description?: string;
+  type: 'date' | 'time' | 'datetime';
+  is_default: boolean;
+  active: boolean;
+  example?: string; // Calculé localement
 }
 
 /**
@@ -48,136 +52,345 @@ const DateFormatsSettings: React.FC = () => {
     }
   };
 
-  // État pour les formats de date
-  const [dateFormats, setDateFormats] = useState<DateFormat[]>([
-    {
-      id: '1',
-      name: 'Standard français',
-      format: 'DD/MM/YYYY',
-      example: formatDate('DD/MM/YYYY'),
-      isDefault: true,
-      region: 'Europe'
-    },
-    {
-      id: '2',
-      name: 'Standard américain',
-      format: 'MM/DD/YYYY',
-      example: formatDate('MM/DD/YYYY'),
-      isDefault: false,
-      region: 'Amérique du Nord'
-    },
-    {
-      id: '3',
-      name: 'ISO 8601',
-      format: 'YYYY-MM-DD',
-      example: formatDate('YYYY-MM-DD'),
-      isDefault: false,
-      region: 'International'
-    },
-    {
-      id: '4',
-      name: 'Format britannique',
-      format: 'DD.MM.YYYY',
-      example: formatDate('DD.MM.YYYY'),
-      isDefault: false,
-      region: 'Europe'
-    },
-    {
-      id: '5',
-      name: 'Format court',
-      format: 'DD/MM/YY',
-      example: formatDate('DD/MM/YY'),
-      isDefault: false,
-      region: 'Europe'
-    },
-    {
-      id: '6',
-      name: 'Format japonais',
-      format: 'YYYY年MM月DD日',
-      example: `${currentDate.getFullYear()}年${(currentDate.getMonth() + 1).toString().padStart(2, '0')}月${currentDate.getDate().toString().padStart(2, '0')}日`,
-      isDefault: false,
-      region: 'Asie'
+  // Fonction pour suggérer un format unique lorsqu'un format existe déjà
+  const suggestUniqueFormat = (format: string): string => {
+    // Ajouter un suffixe numérique au format
+    const match = format.match(/^(.+?)(\d*)$/);
+    if (match) {
+      const base = match[1];
+      const num = match[2] ? parseInt(match[2]) + 1 : 1;
+      return `${base}${num}`;
     }
-  ]);
+    return `${format}_1`;
+  };
 
-  // Régions disponibles
-  const regions = ['Europe', 'Amérique du Nord', 'Amérique du Sud', 'Asie', 'Afrique', 'Océanie', 'International'];
+  // État pour les formats de date
+  const [dateFormats, setDateFormats] = useState<DateFormat[]>([]);
+
+  // État pour le chargement
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Toast pour les notifications
+  const { toast } = useToast();
+
+  // Charger les formats de date depuis l'API
+  useEffect(() => {
+    const fetchDateFormats = async () => {
+      try {
+        const data = await dateFormatService.getAll();
+
+        // Transformer les données pour correspondre à notre interface et ajouter l'exemple
+        const transformedDateFormats = data.map(format => ({
+          id: format.id,
+          name: format.name,
+          format: format.format,
+          description: format.description,
+          type: format.type,
+          is_default: format.is_default,
+          active: format.active,
+          example: formatDate(format.format)
+        }));
+
+        setDateFormats(transformedDateFormats);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erreur lors du chargement des formats de date:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les formats de date',
+          variant: 'destructive'
+        });
+        setLoading(false);
+      }
+    };
+
+    fetchDateFormats();
+  }, []);
+
+  // Types de formats disponibles
+  const formatTypes = [
+    { value: 'date', label: 'Date' },
+    { value: 'time', label: 'Heure' },
+    { value: 'datetime', label: 'Date et heure' }
+  ];
 
   // État pour la recherche
   const [searchTerm, setSearchTerm] = useState('');
-  const [regionFilter, setRegionFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
 
   // État pour le format de date en cours d'édition
   const [editingDateFormat, setEditingDateFormat] = useState<DateFormat | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Filtrer les formats de date en fonction du terme de recherche et du filtre de région
+  // Filtrer les formats de date en fonction du terme de recherche et du filtre de type
   const filteredDateFormats = dateFormats.filter(dateFormat => {
     const matchesSearch =
       dateFormat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       dateFormat.format.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesRegion = regionFilter && regionFilter !== 'all' ? dateFormat.region === regionFilter : true;
+    const matchesType = typeFilter && typeFilter !== 'all' ? dateFormat.type === typeFilter : true;
 
-    return matchesSearch && matchesRegion;
+    return matchesSearch && matchesType;
   });
 
   // Gérer l'ajout ou la modification d'un format de date
-  const handleSaveDateFormat = (dateFormat: DateFormat) => {
-    // Si le nouveau format est défini comme par défaut, mettre à jour tous les autres formats
-    const updatedDateFormat = {
-      ...dateFormat,
-      example: formatDate(dateFormat.format)
-    };
+  const handleSaveDateFormat = async (dateFormat: DateFormat) => {
+    setSaving(true);
 
-    if (updatedDateFormat.isDefault) {
-      const updatedFormats = dateFormats.map(format => ({
-        ...format,
-        isDefault: format.id === updatedDateFormat.id
-      }));
+    try {
+      // Ajouter l'exemple calculé
+      const updatedDateFormat = {
+        ...dateFormat,
+        example: formatDate(dateFormat.format)
+      };
 
       if (editingDateFormat) {
         // Mise à jour d'un format existant
-        setDateFormats(updatedFormats);
-      } else {
-        // Ajout d'un nouveau format
-        setDateFormats([...updatedFormats, { ...updatedDateFormat, id: String(dateFormats.length + 1) }]);
-      }
-    } else {
-      if (editingDateFormat) {
-        // Mise à jour d'un format existant sans changer le statut par défaut des autres
-        setDateFormats(dateFormats.map(format =>
-          format.id === updatedDateFormat.id ? updatedDateFormat : format
-        ));
-      } else {
-        // Ajout d'un nouveau format
-        setDateFormats([...dateFormats, { ...updatedDateFormat, id: String(dateFormats.length + 1) }]);
-      }
-    }
+        // Assurons-nous que tous les champs requis sont présents et du bon type
+        const apiFormat = {
+          name: updatedDateFormat.name,
+          format: updatedDateFormat.format,
+          description: updatedDateFormat.description || '',
+          type: updatedDateFormat.type || 'date',
+          is_default: Boolean(updatedDateFormat.is_default),
+          active: updatedDateFormat.active !== undefined ? Boolean(updatedDateFormat.active) : true
+        };
 
-    setIsDialogOpen(false);
-    setEditingDateFormat(null);
+        console.log('Données envoyées au serveur pour mise à jour:', apiFormat);
+
+        const updatedFormat = await dateFormatService.update(updatedDateFormat.id, apiFormat);
+
+        // Transformer les données pour correspondre à notre interface et ajouter l'exemple
+        const transformedFormat = {
+          id: updatedFormat.id,
+          name: updatedFormat.name,
+          format: updatedFormat.format,
+          description: updatedFormat.description,
+          type: updatedFormat.type,
+          is_default: updatedFormat.is_default,
+          active: updatedFormat.active,
+          example: formatDate(updatedFormat.format)
+        };
+
+        // Si le format a été défini comme par défaut, recharger tous les formats
+        // car d'autres formats ont pu être modifiés côté serveur
+        if (updatedDateFormat.is_default && !editingDateFormat.is_default) {
+          const allFormats = await dateFormatService.getAll();
+          const transformedFormats = allFormats.map(format => ({
+            id: format.id,
+            name: format.name,
+            format: format.format,
+            description: format.description,
+            type: format.type,
+            is_default: format.is_default,
+            active: format.active,
+            example: formatDate(format.format)
+          }));
+
+          setDateFormats(transformedFormats);
+        } else {
+          // Sinon, mettre à jour uniquement le format modifié
+          setDateFormats(dateFormats.map(format =>
+            format.id === transformedFormat.id ? transformedFormat : format
+          ));
+        }
+
+        toast({
+          title: 'Succès',
+          description: 'Le format de date a été mis à jour avec succès',
+          variant: 'default'
+        });
+      } else {
+        // Ajout d'un nouveau format
+        // Assurons-nous que tous les champs requis sont présents et du bon type
+        const apiFormat = {
+          name: updatedDateFormat.name,
+          format: updatedDateFormat.format,
+          description: updatedDateFormat.description || '',
+          type: updatedDateFormat.type || 'date',
+          is_default: Boolean(updatedDateFormat.is_default),
+          active: updatedDateFormat.active !== undefined ? Boolean(updatedDateFormat.active) : true
+        };
+
+        console.log('Données envoyées au serveur:', apiFormat);
+
+        const newFormat = await dateFormatService.create(apiFormat);
+
+        // Transformer les données pour correspondre à notre interface et ajouter l'exemple
+        const transformedFormat = {
+          id: newFormat.id,
+          name: newFormat.name,
+          format: newFormat.format,
+          description: newFormat.description,
+          type: newFormat.type,
+          is_default: newFormat.is_default,
+          active: newFormat.active,
+          example: formatDate(newFormat.format)
+        };
+
+        // Si le nouveau format est défini comme par défaut, recharger tous les formats
+        if (transformedFormat.is_default) {
+          const allFormats = await dateFormatService.getAll();
+          const transformedFormats = allFormats.map(format => ({
+            id: format.id,
+            name: format.name,
+            format: format.format,
+            description: format.description,
+            type: format.type,
+            is_default: format.is_default,
+            active: format.active,
+            example: formatDate(format.format)
+          }));
+
+          setDateFormats(transformedFormats);
+        } else {
+          // Sinon, ajouter simplement le nouveau format
+          setDateFormats([...dateFormats, transformedFormat]);
+        }
+
+        toast({
+          title: 'Succès',
+          description: 'Le format de date a été ajouté avec succès',
+          variant: 'default'
+        });
+      }
+
+      setIsDialogOpen(false);
+      setEditingDateFormat(null);
+    } catch (error: any) {
+      console.error('Erreur lors de l\'enregistrement du format de date:', error);
+
+      // Vérifier si nous avons un message d'erreur spécifique du serveur
+      let errorMessage = 'Impossible d\'enregistrer le format de date';
+
+      if (error.response && error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message;
+
+        // Si l'erreur indique que le format existe déjà, suggérer un format unique
+        if (errorMessage.includes('existe déjà') && !editingDateFormat) {
+          const uniqueFormat = suggestUniqueFormat(dateFormat.format);
+          const uniqueName = `${dateFormat.name} (variante)`;
+
+          toast({
+            title: 'Format déjà existant',
+            description: `Le format "${dateFormat.format}" existe déjà. Voulez-vous essayer avec "${uniqueFormat}" ?`,
+            variant: 'destructive',
+            action: (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Créer un nouveau format avec le format unique suggéré
+                  handleSaveDateFormat({
+                    ...dateFormat,
+                    name: uniqueName,
+                    format: uniqueFormat
+                  });
+                }}
+              >
+                Utiliser ce format
+              </Button>
+            )
+          });
+          return;
+        }
+      }
+
+      toast({
+        title: 'Erreur',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Gérer la suppression d'un format de date
-  const handleDeleteDateFormat = (id: string) => {
+  const handleDeleteDateFormat = async (id: string) => {
     // Vérifier si le format à supprimer est le format par défaut
     const formatToDelete = dateFormats.find(format => format.id === id);
 
-    if (formatToDelete?.isDefault) {
-      alert('Vous ne pouvez pas supprimer le format par défaut. Veuillez d\'abord définir un autre format comme format par défaut.');
+    if (formatToDelete?.is_default) {
+      toast({
+        title: 'Action impossible',
+        description: 'Vous ne pouvez pas supprimer le format par défaut. Veuillez d\'abord définir un autre format comme format par défaut.',
+        variant: 'destructive'
+      });
       return;
     }
 
-    setDateFormats(dateFormats.filter(format => format.id !== id));
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce format de date ?')) {
+      try {
+        await dateFormatService.delete(id);
+
+        setDateFormats(dateFormats.filter(format => format.id !== id));
+
+        toast({
+          title: 'Succès',
+          description: 'Le format de date a été supprimé avec succès',
+          variant: 'default'
+        });
+      } catch (error: any) {
+        console.error('Erreur lors de la suppression du format de date:', error);
+
+        // Vérifier si nous avons un message d'erreur spécifique du serveur
+        let errorMessage = 'Impossible de supprimer le format de date';
+
+        if (error.response && error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+
+        toast({
+          title: 'Erreur',
+          description: errorMessage,
+          variant: 'destructive'
+        });
+      }
+    }
   };
 
   // Gérer le changement de format par défaut
-  const handleSetDefaultDateFormat = (id: string) => {
-    setDateFormats(dateFormats.map(format => ({
-      ...format,
-      isDefault: format.id === id
-    })));
+  const handleSetDefaultDateFormat = async (id: string) => {
+    try {
+      const updatedFormat = await dateFormatService.setDefault(id);
+
+      // Recharger tous les formats car plusieurs ont pu être modifiés
+      const allFormats = await dateFormatService.getAll();
+      const transformedFormats = allFormats.map(format => ({
+        id: format.id,
+        name: format.name,
+        format: format.format,
+        description: format.description,
+        type: format.type,
+        is_default: format.is_default,
+        active: format.active,
+        example: formatDate(format.format)
+      }));
+
+      setDateFormats(transformedFormats);
+
+      toast({
+        title: 'Succès',
+        description: `Le format ${updatedFormat.name} a été défini comme format par défaut`,
+        variant: 'default'
+      });
+    } catch (error: any) {
+      console.error('Erreur lors du changement de format par défaut:', error);
+
+      // Vérifier si nous avons un message d'erreur spécifique du serveur
+      let errorMessage = 'Impossible de changer le format par défaut';
+
+      if (error.response && error.response.data && error.response.data.message) {
+        errorMessage = error.response.data.message;
+      }
+
+      toast({
+        title: 'Erreur',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -222,15 +435,17 @@ const DateFormatsSettings: React.FC = () => {
                   id: '',
                   name: '',
                   format: '',
-                  example: '',
-                  isDefault: false,
-                  region: 'Europe'
+                  description: '',
+                  type: 'date' as 'date' | 'time' | 'datetime',
+                  is_default: false,
+                  active: true,
+                  example: ''
                 }}
-                regions={regions}
                 formatDate={formatDate}
                 onSave={handleSaveDateFormat}
                 onCancel={() => setIsDialogOpen(false)}
-                hasDefaultFormat={dateFormats.some(format => format.isDefault)}
+                hasDefaultFormat={dateFormats.some(format => format.is_default)}
+                saving={saving}
               />
             </DialogContent>
           </Dialog>
@@ -248,14 +463,14 @@ const DateFormatsSettings: React.FC = () => {
               />
             </div>
             <div className="w-full md:w-64">
-              <Select value={regionFilter} onValueChange={setRegionFilter}>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Filtrer par région" />
+                  <SelectValue placeholder="Filtrer par type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Toutes les régions</SelectItem>
-                  {regions.map(region => (
-                    <SelectItem key={region} value={region}>{region}</SelectItem>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  {formatTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -264,80 +479,109 @@ const DateFormatsSettings: React.FC = () => {
 
           {/* Tableau des formats de date */}
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Format</TableHead>
-                  <TableHead>Exemple</TableHead>
-                  <TableHead>Région</TableHead>
-                  <TableHead>Par défaut</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDateFormats.map((dateFormat) => (
-                  <TableRow key={dateFormat.id}>
-                    <TableCell className="font-medium">{dateFormat.name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="bg-muted px-1 py-0.5 rounded text-sm">{dateFormat.format}</code>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>DD = Jour, MM = Mois, YYYY = Année (4 chiffres), YY = Année (2 chiffres)</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </TableCell>
-                    <TableCell>{dateFormat.example}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{dateFormat.region}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Switch
-                          checked={dateFormat.isDefault}
-                          onCheckedChange={() => handleSetDefaultDateFormat(dateFormat.id)}
-                          disabled={dateFormat.isDefault}
-                        />
-                        {dateFormat.isDefault && (
-                          <Badge variant="secondary" className="ml-2">
-                            Par défaut
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditingDateFormat(dateFormat);
-                            setIsDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteDateFormat(dateFormat.id)}
-                          disabled={dateFormat.isDefault}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-ivory-orange" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Format</TableHead>
+                    <TableHead>Exemple</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Par défaut</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredDateFormats.length > 0 ? (
+                    filteredDateFormats.map((dateFormat) => (
+                      <TableRow key={dateFormat.id}>
+                        <TableCell className="font-medium">{dateFormat.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <code className="bg-muted px-1 py-0.5 rounded text-sm">{dateFormat.format}</code>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>DD = Jour, MM = Mois, YYYY = Année (4 chiffres), YY = Année (2 chiffres)</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableCell>
+                        <TableCell>{dateFormat.example}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {dateFormat.type === 'date' ? 'Date' :
+                             dateFormat.type === 'time' ? 'Heure' : 'Date et heure'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Switch
+                              checked={dateFormat.is_default}
+                              onCheckedChange={() => handleSetDefaultDateFormat(dateFormat.id)}
+                              disabled={dateFormat.is_default}
+                            />
+                            {dateFormat.is_default && (
+                              <Badge variant="secondary" className="ml-2">
+                                Par défaut
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              dateFormat.active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {dateFormat.active ? 'Actif' : 'Inactif'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingDateFormat(dateFormat);
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteDateFormat(dateFormat.id)}
+                              disabled={dateFormat.is_default}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                        {searchTerm || typeFilter ? 'Aucun format de date trouvé pour cette recherche' : 'Aucun format de date disponible'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -348,20 +592,20 @@ const DateFormatsSettings: React.FC = () => {
 // Composant de formulaire pour ajouter/modifier un format de date
 interface DateFormatFormProps {
   dateFormat: DateFormat;
-  regions: string[];
   formatDate: (format: string) => string;
   onSave: (dateFormat: DateFormat) => void;
   onCancel: () => void;
   hasDefaultFormat: boolean;
+  saving?: boolean;
 }
 
 const DateFormatForm: React.FC<DateFormatFormProps> = ({
   dateFormat,
-  regions,
   formatDate,
   onSave,
   onCancel,
-  hasDefaultFormat
+  hasDefaultFormat,
+  saving = false
 }) => {
   const [formData, setFormData] = useState<DateFormat>(dateFormat);
   const [formatPreview, setFormatPreview] = useState(dateFormat.example || formatDate(dateFormat.format));
@@ -429,32 +673,43 @@ const DateFormatForm: React.FC<DateFormatFormProps> = ({
           </div>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="region" className="text-right">Région</Label>
+          <Label htmlFor="description" className="text-right">Description</Label>
+          <Input
+            id="description"
+            name="description"
+            value={formData.description || ''}
+            onChange={handleChange}
+            className="col-span-3"
+            placeholder="Description du format"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="type" className="text-right">Type</Label>
           <Select
-            value={formData.region}
-            onValueChange={(value) => handleSelectChange('region', value)}
+            value={formData.type}
+            onValueChange={(value) => handleSelectChange('type', value as 'date' | 'time' | 'datetime')}
           >
             <SelectTrigger className="col-span-3">
-              <SelectValue placeholder="Sélectionnez une région" />
+              <SelectValue placeholder="Sélectionnez un type" />
             </SelectTrigger>
             <SelectContent>
-              {regions.map(region => (
-                <SelectItem key={region} value={region}>{region}</SelectItem>
-              ))}
+              <SelectItem value="date">Date</SelectItem>
+              <SelectItem value="time">Heure</SelectItem>
+              <SelectItem value="datetime">Date et heure</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="isDefault" className="text-right">Par défaut</Label>
+          <Label htmlFor="is_default" className="text-right">Par défaut</Label>
           <div className="col-span-3 flex items-center gap-2">
             <Switch
-              id="isDefault"
-              checked={formData.isDefault}
-              onCheckedChange={(checked) => setFormData({...formData, isDefault: checked})}
-              disabled={formData.isDefault}
+              id="is_default"
+              checked={formData.is_default}
+              onCheckedChange={(checked) => setFormData({...formData, is_default: checked})}
+              disabled={formData.is_default}
             />
             <span className="text-sm text-muted-foreground">
-              {formData.isDefault
+              {formData.is_default
                 ? 'Ce format est défini comme format par défaut'
                 : hasDefaultFormat
                   ? 'Activer pour définir ce format comme format par défaut'
@@ -462,13 +717,45 @@ const DateFormatForm: React.FC<DateFormatFormProps> = ({
             </span>
           </div>
         </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="active" className="text-right">Actif</Label>
+          <div className="col-span-3 flex items-center gap-2">
+            <Switch
+              id="active"
+              checked={formData.active}
+              onCheckedChange={(checked) => setFormData({...formData, active: checked})}
+              disabled={formData.is_default && formData.active}
+            />
+            <span className="text-sm text-muted-foreground">
+              {formData.active
+                ? 'Ce format est actif et disponible pour les utilisateurs'
+                : 'Ce format est inactif et n\'est pas disponible pour les utilisateurs'}
+            </span>
+          </div>
+        </div>
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={saving}
+        >
           Annuler
         </Button>
-        <Button type="submit" className="bg-ivory-orange hover:bg-ivory-orange/90">
-          Enregistrer
+        <Button
+          type="submit"
+          className="bg-ivory-orange hover:bg-ivory-orange/90"
+          disabled={saving}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enregistrement...
+            </>
+          ) : (
+            'Enregistrer'
+          )}
         </Button>
       </DialogFooter>
     </form>

@@ -1,19 +1,14 @@
 /**
  * Script pour générer automatiquement le registre des modules
- * 
+ *
  * Ce script scanne le dossier addons, identifie tous les modules valides
  * et génère automatiquement le fichier ModuleRegistry.ts
- * 
+ *
  * Usage: node scripts/generateModuleRegistry.js
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Obtenir le chemin du répertoire actuel
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const fs = require('fs');
+const path = require('path');
 
 // Chemins
 const ADDONS_DIR = path.resolve(__dirname, '../addons');
@@ -36,7 +31,7 @@ function isValidModule(modulePath) {
 function generateRegistryContent(moduleNames) {
   return `/**
  * Registre des modules de l'application
- * 
+ *
  * ATTENTION: Ce fichier est généré automatiquement par le script generateModuleRegistry.js
  * Ne pas modifier manuellement ce fichier, il sera écrasé à la prochaine génération.
  */
@@ -88,7 +83,7 @@ export const getAllModules = async (): Promise<Addon[]> => {
   const modulePromises = AVAILABLE_MODULE_NAMES.map(async (name) => {
     const module = await loadModule(name);
     if (!module) return null;
-    
+
     // Vérifier que le module a un manifeste et des routes
     if (!module.manifest || !module.routes) {
       console.warn(\`Le module \${name} n'a pas de manifeste ou de routes définis.\`);
@@ -141,7 +136,7 @@ function main() {
       .map(dirent => dirent.name);
 
     // Filtrer les modules valides
-    const validModules = addonDirs.filter(dir => 
+    const validModules = addonDirs.filter(dir =>
       isValidModule(path.join(ADDONS_DIR, dir))
     );
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   DollarSign, Search, Plus, MoreHorizontal,
-  Edit, Trash2, Save, Check, X, ArrowUpDown
+  Edit, Trash2, Save, Check, X, ArrowUpDown, Loader2
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
@@ -28,6 +28,8 @@ import {
   DialogTrigger,
 } from '../../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { useToast } from '../../components/ui/use-toast';
+import { currencyService, Currency as ApiCurrency } from '../../services/api';
 
 /**
  * Page de gestion des devises
@@ -38,76 +40,48 @@ const CurrenciesSettings: React.FC = () => {
   const [isAddCurrencyDialogOpen, setIsAddCurrencyDialogOpen] = useState(false);
   const [editingCurrency, setEditingCurrency] = useState<string | null>(null);
 
+  // État pour le chargement
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Toast pour les notifications
+  const { toast } = useToast();
+
   // État pour le formulaire d'ajout de devise
   const [newCurrency, setNewCurrency] = useState({
     name: '',
     symbol: '',
     code: '',
     rate: '1.0',
-    position: 'after',
+    position: 'after' as 'before' | 'after',
     decimal_places: '2',
     rounding: '0.01',
     active: true
   });
 
-  // Données simulées pour les devises (basées sur Odoo)
-  const [currencies, setCurrencies] = useState([
-    {
-      id: '1',
-      name: 'Euro',
-      symbol: '€',
-      code: 'EUR',
-      rate: 1.0,
-      position: 'after',
-      decimal_places: 2,
-      rounding: 0.01,
-      active: true
-    },
-    {
-      id: '2',
-      name: 'Dollar américain',
-      symbol: '$',
-      code: 'USD',
-      rate: 1.08,
-      position: 'before',
-      decimal_places: 2,
-      rounding: 0.01,
-      active: true
-    },
-    {
-      id: '3',
-      name: 'Livre sterling',
-      symbol: '£',
-      code: 'GBP',
-      rate: 0.85,
-      position: 'before',
-      decimal_places: 2,
-      rounding: 0.01,
-      active: true
-    },
-    {
-      id: '4',
-      name: 'Franc suisse',
-      symbol: 'CHF',
-      code: 'CHF',
-      rate: 0.96,
-      position: 'after',
-      decimal_places: 2,
-      rounding: 0.01,
-      active: true
-    },
-    {
-      id: '5',
-      name: 'Yen japonais',
-      symbol: '¥',
-      code: 'JPY',
-      rate: 160.45,
-      position: 'before',
-      decimal_places: 0,
-      rounding: 1.0,
-      active: false
-    }
-  ]);
+  // État pour les devises
+  const [currencies, setCurrencies] = useState<ApiCurrency[]>([]);
+
+  // Charger les devises depuis l'API
+  useEffect(() => {
+    const fetchCurrencies = async () => {
+      try {
+        const data = await currencyService.getAll();
+        setCurrencies(data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erreur lors du chargement des devises:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les devises',
+          variant: 'destructive'
+        });
+        setLoading(false);
+      }
+    };
+
+    fetchCurrencies();
+  }, []);
 
   // Filtrer les devises en fonction du terme de recherche
   const filteredCurrencies = currencies.filter(currency =>
@@ -133,45 +107,99 @@ const CurrenciesSettings: React.FC = () => {
   };
 
   // Ajouter une nouvelle devise
-  const handleAddCurrency = () => {
-    const newId = (currencies.length + 1).toString();
-    const newCurrencyWithId = {
-      id: newId,
-      name: newCurrency.name,
-      symbol: newCurrency.symbol,
-      code: newCurrency.code,
-      rate: parseFloat(newCurrency.rate),
-      position: newCurrency.position,
-      decimal_places: parseInt(newCurrency.decimal_places),
-      rounding: parseFloat(newCurrency.rounding),
-      active: newCurrency.active
-    };
+  const handleAddCurrency = async () => {
+    setSaving(true);
 
-    setCurrencies([...currencies, newCurrencyWithId]);
-    setNewCurrency({
-      name: '',
-      symbol: '',
-      code: '',
-      rate: '1.0',
-      position: 'after',
-      decimal_places: '2',
-      rounding: '0.01',
-      active: true
-    });
-    setIsAddCurrencyDialogOpen(false);
+    try {
+      const newCurrencyData = {
+        name: newCurrency.name,
+        symbol: newCurrency.symbol,
+        code: newCurrency.code,
+        rate: parseFloat(newCurrency.rate),
+        position: newCurrency.position,
+        decimal_places: parseInt(newCurrency.decimal_places),
+        rounding: parseFloat(newCurrency.rounding),
+        active: newCurrency.active
+      };
+
+      const createdCurrency = await currencyService.create(newCurrencyData);
+
+      setCurrencies([...currencies, createdCurrency]);
+      setNewCurrency({
+        name: '',
+        symbol: '',
+        code: '',
+        rate: '1.0',
+        position: 'after' as 'before' | 'after',
+        decimal_places: '2',
+        rounding: '0.01',
+        active: true
+      });
+
+      toast({
+        title: 'Succès',
+        description: 'La devise a été ajoutée avec succès',
+        variant: 'default'
+      });
+
+      setIsAddCurrencyDialogOpen(false);
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout de la devise:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'ajouter la devise',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Activer/désactiver une devise
-  const toggleCurrencyStatus = (currencyId: string) => {
-    setCurrencies(currencies.map(currency =>
-      currency.id === currencyId ? { ...currency, active: !currency.active } : currency
-    ));
+  const toggleCurrencyStatus = async (currencyId: string) => {
+    try {
+      const updatedCurrency = await currencyService.toggleStatus(currencyId);
+
+      setCurrencies(currencies.map(currency =>
+        currency.id === currencyId ? updatedCurrency : currency
+      ));
+
+      toast({
+        title: 'Succès',
+        description: `La devise a été ${updatedCurrency.active ? 'activée' : 'désactivée'} avec succès`,
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors du changement de statut de la devise:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de changer le statut de la devise',
+        variant: 'destructive'
+      });
+    }
   };
 
   // Supprimer une devise
-  const deleteCurrency = (currencyId: string) => {
+  const deleteCurrency = async (currencyId: string) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette devise ?')) {
-      setCurrencies(currencies.filter(currency => currency.id !== currencyId));
+      try {
+        await currencyService.delete(currencyId);
+
+        setCurrencies(currencies.filter(currency => currency.id !== currencyId));
+
+        toast({
+          title: 'Succès',
+          description: 'La devise a été supprimée avec succès',
+          variant: 'default'
+        });
+      } catch (error) {
+        console.error('Erreur lors de la suppression de la devise:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de supprimer la devise',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
@@ -181,7 +209,34 @@ const CurrenciesSettings: React.FC = () => {
   };
 
   // Terminer l'édition d'une devise
-  const finishEditingCurrency = () => {
+  const finishEditingCurrency = async () => {
+    if (editingCurrency) {
+      const currency = currencies.find(c => c.id === editingCurrency);
+
+      if (currency) {
+        try {
+          await currencyService.update(editingCurrency, currency);
+
+          toast({
+            title: 'Succès',
+            description: 'La devise a été mise à jour avec succès',
+            variant: 'default'
+          });
+        } catch (error) {
+          console.error('Erreur lors de la mise à jour de la devise:', error);
+          toast({
+            title: 'Erreur',
+            description: 'Impossible de mettre à jour la devise',
+            variant: 'destructive'
+          });
+
+          // Recharger les devises pour annuler les modifications
+          const data = await currencyService.getAll();
+          setCurrencies(data);
+        }
+      }
+    }
+
     setEditingCurrency(null);
   };
 
@@ -321,11 +376,25 @@ const CurrenciesSettings: React.FC = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddCurrencyDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddCurrencyDialogOpen(false)}
+                disabled={saving}
+              >
                 Annuler
               </Button>
-              <Button onClick={handleAddCurrency}>
-                Ajouter
+              <Button
+                onClick={handleAddCurrency}
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Ajout en cours...
+                  </>
+                ) : (
+                  'Ajouter'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -352,26 +421,31 @@ const CurrenciesSettings: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Symbole</TableHead>
-                <TableHead>
-                  <div className="flex items-center">
-                    Taux
-                    <ArrowUpDown className="ml-1 h-4 w-4" />
-                  </div>
-                </TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Décimales</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCurrencies.length > 0 ? (
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-ivory-orange" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Symbole</TableHead>
+                  <TableHead>
+                    <div className="flex items-center">
+                      Taux
+                      <ArrowUpDown className="ml-1 h-4 w-4" />
+                    </div>
+                  </TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Décimales</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCurrencies.length > 0 ? (
                 filteredCurrencies.map(currency => (
                   <TableRow key={currency.id}>
                     <TableCell className="font-medium">
@@ -519,12 +593,13 @@ const CurrenciesSettings: React.FC = () => {
                   </TableCell>
                 </TableRow>
               )}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between items-center">
           <div className="text-sm text-muted-foreground">
-            {filteredCurrencies.length} devise{filteredCurrencies.length !== 1 ? 's' : ''} au total
+            {loading ? 'Chargement...' : `${filteredCurrencies.length} devise${filteredCurrencies.length !== 1 ? 's' : ''} au total`}
           </div>
         </CardFooter>
       </Card>

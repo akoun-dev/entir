@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Button } from '../../components/ui/button';
@@ -8,17 +8,19 @@ import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Globe, Search, Plus, Pencil, Trash2, MapPin } from 'lucide-react';
+import { Globe, Search, Plus, Pencil, Trash2, MapPin, Loader2 } from 'lucide-react';
+import { useToast } from '../../components/ui/use-toast';
+import { countryService, Country as ApiCountry } from '../../services/api';
 
 // Types pour les pays
 interface Country {
   id: string;
   code: string;
   name: string;
-  phoneCode: string;
+  phone_code: string;
   region: string;
-  currency: string;
-  isActive: boolean;
+  currency_code: string;
+  active: boolean;
 }
 
 /**
@@ -27,98 +29,14 @@ interface Country {
  */
 const CountriesSettings: React.FC = () => {
   // État pour les pays
-  const [countries, setCountries] = useState<Country[]>([
-    {
-      id: '1',
-      code: 'FR',
-      name: 'France',
-      phoneCode: '+33',
-      region: 'Europe',
-      currency: 'EUR',
-      isActive: true
-    },
-    {
-      id: '2',
-      code: 'US',
-      name: 'États-Unis',
-      phoneCode: '+1',
-      region: 'Amérique du Nord',
-      currency: 'USD',
-      isActive: true
-    },
-    {
-      id: '3',
-      code: 'CA',
-      name: 'Canada',
-      phoneCode: '+1',
-      region: 'Amérique du Nord',
-      currency: 'CAD',
-      isActive: true
-    },
-    {
-      id: '4',
-      code: 'GB',
-      name: 'Royaume-Uni',
-      phoneCode: '+44',
-      region: 'Europe',
-      currency: 'GBP',
-      isActive: true
-    },
-    {
-      id: '5',
-      code: 'DE',
-      name: 'Allemagne',
-      phoneCode: '+49',
-      region: 'Europe',
-      currency: 'EUR',
-      isActive: true
-    },
-    {
-      id: '6',
-      code: 'ES',
-      name: 'Espagne',
-      phoneCode: '+34',
-      region: 'Europe',
-      currency: 'EUR',
-      isActive: true
-    },
-    {
-      id: '7',
-      code: 'IT',
-      name: 'Italie',
-      phoneCode: '+39',
-      region: 'Europe',
-      currency: 'EUR',
-      isActive: true
-    },
-    {
-      id: '8',
-      code: 'JP',
-      name: 'Japon',
-      phoneCode: '+81',
-      region: 'Asie',
-      currency: 'JPY',
-      isActive: false
-    },
-    {
-      id: '9',
-      code: 'AU',
-      name: 'Australie',
-      phoneCode: '+61',
-      region: 'Océanie',
-      currency: 'AUD',
-      isActive: false
-    },
-    {
-      id: '10',
-      code: 'BR',
-      name: 'Brésil',
-      phoneCode: '+55',
-      region: 'Amérique du Sud',
-      currency: 'BRL',
-      isActive: false
-    }
-  ]);
+  const [countries, setCountries] = useState<Country[]>([]);
+
+  // État pour le chargement
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Toast pour les notifications
+  const { toast } = useToast();
 
   // Régions disponibles
   const regions = ['Europe', 'Amérique du Nord', 'Amérique du Sud', 'Asie', 'Afrique', 'Océanie', 'Antarctique'];
@@ -134,12 +52,45 @@ const CountriesSettings: React.FC = () => {
   const [editingCountry, setEditingCountry] = useState<Country | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // Charger les pays depuis l'API
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const data = await countryService.getAll();
+
+        // Transformer les données pour correspondre à notre interface
+        const transformedCountries = data.map(country => ({
+          id: country.id,
+          code: country.code,
+          name: country.name,
+          phone_code: country.phone_code || '',
+          region: country.region || '',
+          currency_code: country.currency_code || '',
+          active: country.active
+        }));
+
+        setCountries(transformedCountries);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erreur lors du chargement des pays:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les pays',
+          variant: 'destructive'
+        });
+        setLoading(false);
+      }
+    };
+
+    fetchCountries();
+  }, []);
+
   // Filtrer les pays en fonction du terme de recherche et du filtre de région
   const filteredCountries = countries.filter(country => {
     const matchesSearch =
       country.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       country.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      country.phoneCode.includes(searchTerm);
+      (country.phone_code && country.phone_code.includes(searchTerm));
 
     const matchesRegion = regionFilter && regionFilter !== 'all' ? country.region === regionFilter : true;
 
@@ -147,30 +98,127 @@ const CountriesSettings: React.FC = () => {
   });
 
   // Gérer l'ajout ou la modification d'un pays
-  const handleSaveCountry = (country: Country) => {
-    if (editingCountry) {
-      // Mise à jour d'un pays existant
-      setCountries(countries.map(c => c.id === country.id ? country : c));
-    } else {
-      // Ajout d'un nouveau pays
-      setCountries([...countries, { ...country, id: String(countries.length + 1) }]);
+  const handleSaveCountry = async (country: Country) => {
+    setSaving(true);
+
+    try {
+      if (editingCountry) {
+        // Mise à jour d'un pays existant
+        const updatedCountry = await countryService.update(country.id, country);
+
+        // Transformer les données pour correspondre à notre interface
+        const transformedCountry = {
+          id: updatedCountry.id,
+          code: updatedCountry.code,
+          name: updatedCountry.name,
+          phone_code: updatedCountry.phone_code || '',
+          region: updatedCountry.region || '',
+          currency_code: updatedCountry.currency_code || '',
+          active: updatedCountry.active
+        };
+
+        setCountries(countries.map(c => c.id === country.id ? transformedCountry : c));
+
+        toast({
+          title: 'Succès',
+          description: 'Le pays a été mis à jour avec succès',
+          variant: 'default'
+        });
+      } else {
+        // Ajout d'un nouveau pays
+        const newCountry = await countryService.create(country);
+
+        // Transformer les données pour correspondre à notre interface
+        const transformedCountry = {
+          id: newCountry.id,
+          code: newCountry.code,
+          name: newCountry.name,
+          phone_code: newCountry.phone_code || '',
+          region: newCountry.region || '',
+          currency_code: newCountry.currency_code || '',
+          active: newCountry.active
+        };
+
+        setCountries([...countries, transformedCountry]);
+
+        toast({
+          title: 'Succès',
+          description: 'Le pays a été ajouté avec succès',
+          variant: 'default'
+        });
+      }
+
+      setIsDialogOpen(false);
+      setEditingCountry(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement du pays:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'enregistrer le pays',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
     }
-    setIsDialogOpen(false);
-    setEditingCountry(null);
   };
 
   // Gérer la suppression d'un pays
-  const handleDeleteCountry = (id: string) => {
-    setCountries(countries.filter(c => c.id !== id));
+  const handleDeleteCountry = async (id: string) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce pays ?')) {
+      try {
+        await countryService.delete(id);
+
+        setCountries(countries.filter(c => c.id !== id));
+
+        toast({
+          title: 'Succès',
+          description: 'Le pays a été supprimé avec succès',
+          variant: 'default'
+        });
+      } catch (error) {
+        console.error('Erreur lors de la suppression du pays:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de supprimer le pays',
+          variant: 'destructive'
+        });
+      }
+    }
   };
 
   // Gérer l'activation/désactivation d'un pays
-  const handleToggleCountryStatus = (id: string) => {
-    setCountries(countries.map(country =>
-      country.id === id
-        ? { ...country, isActive: !country.isActive }
-        : country
-    ));
+  const handleToggleCountryStatus = async (id: string) => {
+    try {
+      const updatedCountry = await countryService.toggleStatus(id);
+
+      // Transformer les données pour correspondre à notre interface
+      const transformedCountry = {
+        id: updatedCountry.id,
+        code: updatedCountry.code,
+        name: updatedCountry.name,
+        phone_code: updatedCountry.phone_code || '',
+        region: updatedCountry.region || '',
+        currency_code: updatedCountry.currency_code || '',
+        active: updatedCountry.active
+      };
+
+      setCountries(countries.map(country =>
+        country.id === id ? transformedCountry : country
+      ));
+
+      toast({
+        title: 'Succès',
+        description: `Le pays a été ${transformedCountry.active ? 'activé' : 'désactivé'} avec succès`,
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors du changement de statut du pays:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de changer le statut du pays',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -215,15 +263,16 @@ const CountriesSettings: React.FC = () => {
                   id: '',
                   code: '',
                   name: '',
-                  phoneCode: '',
+                  phone_code: '',
                   region: '',
-                  currency: '',
-                  isActive: true
+                  currency_code: '',
+                  active: true
                 }}
                 regions={regions}
                 currencies={currencies}
                 onSave={handleSaveCountry}
                 onCancel={() => setIsDialogOpen(false)}
+                saving={saving}
               />
             </DialogContent>
           </Dialog>
@@ -257,68 +306,82 @@ const CountriesSettings: React.FC = () => {
 
           {/* Tableau des pays */}
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Indicatif</TableHead>
-                  <TableHead>Région</TableHead>
-                  <TableHead>Devise</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCountries.map((country) => (
-                  <TableRow key={country.id}>
-                    <TableCell className="font-medium">{country.code}</TableCell>
-                    <TableCell>{country.name}</TableCell>
-                    <TableCell>{country.phoneCode}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{country.region}</Badge>
-                    </TableCell>
-                    <TableCell>{country.currency}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={country.isActive}
-                          onCheckedChange={() => handleToggleCountryStatus(country.id)}
-                        />
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          country.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {country.isActive ? 'Actif' : 'Inactif'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditingCountry(country);
-                            setIsDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteCountry(country.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-ivory-orange" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Indicatif</TableHead>
+                    <TableHead>Région</TableHead>
+                    <TableHead>Devise</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredCountries.length > 0 ? (
+                    filteredCountries.map((country) => (
+                      <TableRow key={country.id}>
+                        <TableCell className="font-medium">{country.code}</TableCell>
+                        <TableCell>{country.name}</TableCell>
+                        <TableCell>{country.phone_code}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{country.region}</Badge>
+                        </TableCell>
+                        <TableCell>{country.currency_code}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={country.active}
+                              onCheckedChange={() => handleToggleCountryStatus(country.id)}
+                            />
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              country.active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {country.active ? 'Actif' : 'Inactif'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingCountry(country);
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCountry(country.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                        {searchTerm || regionFilter ? 'Aucun pays trouvé pour cette recherche' : 'Aucun pays disponible'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -333,9 +396,10 @@ interface CountryFormProps {
   currencies: string[];
   onSave: (country: Country) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
-const CountryForm: React.FC<CountryFormProps> = ({ country, regions, currencies, onSave, onCancel }) => {
+const CountryForm: React.FC<CountryFormProps> = ({ country, regions, currencies, onSave, onCancel, saving = false }) => {
   const [formData, setFormData] = useState<Country>(country);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -387,15 +451,14 @@ const CountryForm: React.FC<CountryFormProps> = ({ country, regions, currencies,
           />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="phoneCode" className="text-right">Indicatif</Label>
+          <Label htmlFor="phone_code" className="text-right">Indicatif</Label>
           <Input
-            id="phoneCode"
-            name="phoneCode"
-            value={formData.phoneCode}
+            id="phone_code"
+            name="phone_code"
+            value={formData.phone_code}
             onChange={handleChange}
             className="col-span-3"
             placeholder="+33"
-            required
           />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -415,10 +478,10 @@ const CountryForm: React.FC<CountryFormProps> = ({ country, regions, currencies,
           </Select>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="currency" className="text-right">Devise</Label>
+          <Label htmlFor="currency_code" className="text-right">Devise</Label>
           <Select
-            value={formData.currency}
-            onValueChange={(value) => handleSelectChange('currency', value)}
+            value={formData.currency_code}
+            onValueChange={(value) => handleSelectChange('currency_code', value)}
           >
             <SelectTrigger className="col-span-3">
               <SelectValue placeholder="Sélectionnez une devise" />
@@ -431,22 +494,38 @@ const CountryForm: React.FC<CountryFormProps> = ({ country, regions, currencies,
           </Select>
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="isActive" className="text-right">Actif</Label>
+          <Label htmlFor="active" className="text-right">Actif</Label>
           <div className="col-span-3 flex items-center">
             <Switch
-              id="isActive"
-              checked={formData.isActive}
-              onCheckedChange={(checked) => setFormData({...formData, isActive: checked})}
+              id="active"
+              checked={formData.active}
+              onCheckedChange={(checked) => setFormData({...formData, active: checked})}
             />
           </div>
         </div>
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={saving}
+        >
           Annuler
         </Button>
-        <Button type="submit" className="bg-ivory-orange hover:bg-ivory-orange/90">
-          Enregistrer
+        <Button
+          type="submit"
+          className="bg-ivory-orange hover:bg-ivory-orange/90"
+          disabled={saving}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enregistrement...
+            </>
+          ) : (
+            'Enregistrer'
+          )}
         </Button>
       </DialogFooter>
     </form>

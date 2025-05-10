@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Button } from '../../components/ui/button';
@@ -7,18 +7,20 @@ import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
-import { Languages, Search, Plus, Pencil, Trash2, Check, Globe } from 'lucide-react';
+import { Languages, Search, Plus, Pencil, Trash2, Check, Globe, Loader2 } from 'lucide-react';
+import { useToast } from '../../components/ui/use-toast';
+import { languageService, Language as ApiLanguage } from '../../services/api';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 
 // Types pour les langues
 interface Language {
   id: string;
   code: string;
   name: string;
-  nativeName: string;
-  isDefault: boolean;
-  isActive: boolean;
-  isInstalled: boolean;
-  completionPercentage: number;
+  native_name: string;
+  direction: 'ltr' | 'rtl';
+  is_default: boolean;
+  active: boolean;
 }
 
 /**
@@ -27,78 +29,14 @@ interface Language {
  */
 const LanguagesSettings: React.FC = () => {
   // État pour les langues
-  const [languages, setLanguages] = useState<Language[]>([
-    { 
-      id: '1', 
-      code: 'fr_FR', 
-      name: 'Français', 
-      nativeName: 'Français',
-      isDefault: true, 
-      isActive: true,
-      isInstalled: true,
-      completionPercentage: 100
-    },
-    { 
-      id: '2', 
-      code: 'en_US', 
-      name: 'Anglais (US)', 
-      nativeName: 'English (US)',
-      isDefault: false, 
-      isActive: true,
-      isInstalled: true,
-      completionPercentage: 95
-    },
-    { 
-      id: '3', 
-      code: 'es_ES', 
-      name: 'Espagnol', 
-      nativeName: 'Español',
-      isDefault: false, 
-      isActive: true,
-      isInstalled: true,
-      completionPercentage: 85
-    },
-    { 
-      id: '4', 
-      code: 'de_DE', 
-      name: 'Allemand', 
-      nativeName: 'Deutsch',
-      isDefault: false, 
-      isActive: false,
-      isInstalled: true,
-      completionPercentage: 80
-    },
-    { 
-      id: '5', 
-      code: 'it_IT', 
-      name: 'Italien', 
-      nativeName: 'Italiano',
-      isDefault: false, 
-      isActive: false,
-      isInstalled: true,
-      completionPercentage: 75
-    },
-    { 
-      id: '6', 
-      code: 'pt_BR', 
-      name: 'Portugais (Brésil)', 
-      nativeName: 'Português (Brasil)',
-      isDefault: false, 
-      isActive: false,
-      isInstalled: false,
-      completionPercentage: 0
-    },
-    { 
-      id: '7', 
-      code: 'nl_NL', 
-      name: 'Néerlandais', 
-      nativeName: 'Nederlands',
-      isDefault: false, 
-      isActive: false,
-      isInstalled: false,
-      completionPercentage: 0
-    }
-  ]);
+  const [languages, setLanguages] = useState<Language[]>([]);
+
+  // État pour le chargement
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Toast pour les notifications
+  const { toast } = useToast();
 
   // État pour la recherche
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,55 +45,204 @@ const LanguagesSettings: React.FC = () => {
   const [editingLanguage, setEditingLanguage] = useState<Language | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // Charger les langues depuis l'API
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        const data = await languageService.getAll();
+
+        // Transformer les données pour correspondre à notre interface
+        const transformedLanguages = data.map(language => ({
+          id: language.id,
+          code: language.code,
+          name: language.name,
+          native_name: language.native_name || '',
+          direction: language.direction,
+          is_default: language.is_default,
+          active: language.active
+        }));
+
+        setLanguages(transformedLanguages);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erreur lors du chargement des langues:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les langues',
+          variant: 'destructive'
+        });
+        setLoading(false);
+      }
+    };
+
+    fetchLanguages();
+  }, []);
+
   // Filtrer les langues en fonction du terme de recherche
-  const filteredLanguages = languages.filter(language => 
-    language.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredLanguages = languages.filter(language =>
+    language.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     language.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    language.nativeName.toLowerCase().includes(searchTerm.toLowerCase())
+    (language.native_name && language.native_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   // Gérer l'ajout ou la modification d'une langue
-  const handleSaveLanguage = (language: Language) => {
-    if (editingLanguage) {
-      // Mise à jour d'une langue existante
-      setLanguages(languages.map(l => l.id === language.id ? language : l));
-    } else {
-      // Ajout d'une nouvelle langue
-      setLanguages([...languages, { ...language, id: String(languages.length + 1) }]);
+  const handleSaveLanguage = async (language: Language) => {
+    setSaving(true);
+
+    try {
+      if (editingLanguage) {
+        // Mise à jour d'une langue existante
+        const updatedLanguage = await languageService.update(language.id, language);
+
+        // Transformer les données pour correspondre à notre interface
+        const transformedLanguage = {
+          id: updatedLanguage.id,
+          code: updatedLanguage.code,
+          name: updatedLanguage.name,
+          native_name: updatedLanguage.native_name || '',
+          direction: updatedLanguage.direction,
+          is_default: updatedLanguage.is_default,
+          active: updatedLanguage.active
+        };
+
+        setLanguages(languages.map(l => l.id === language.id ? transformedLanguage : l));
+
+        toast({
+          title: 'Succès',
+          description: 'La langue a été mise à jour avec succès',
+          variant: 'default'
+        });
+      } else {
+        // Ajout d'une nouvelle langue
+        const newLanguage = await languageService.create(language);
+
+        // Transformer les données pour correspondre à notre interface
+        const transformedLanguage = {
+          id: newLanguage.id,
+          code: newLanguage.code,
+          name: newLanguage.name,
+          native_name: newLanguage.native_name || '',
+          direction: newLanguage.direction,
+          is_default: newLanguage.is_default,
+          active: newLanguage.active
+        };
+
+        setLanguages([...languages, transformedLanguage]);
+
+        toast({
+          title: 'Succès',
+          description: 'La langue a été ajoutée avec succès',
+          variant: 'default'
+        });
+      }
+
+      setIsDialogOpen(false);
+      setEditingLanguage(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement de la langue:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'enregistrer la langue',
+        variant: 'destructive'
+      });
+    } finally {
+      setSaving(false);
     }
-    setIsDialogOpen(false);
-    setEditingLanguage(null);
   };
 
   // Gérer la suppression d'une langue
-  const handleDeleteLanguage = (id: string) => {
-    setLanguages(languages.filter(l => l.id !== id));
+  const handleDeleteLanguage = async (id: string) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette langue ?')) {
+      try {
+        await languageService.delete(id);
+
+        setLanguages(languages.filter(l => l.id !== id));
+
+        toast({
+          title: 'Succès',
+          description: 'La langue a été supprimée avec succès',
+          variant: 'default'
+        });
+      } catch (error) {
+        console.error('Erreur lors de la suppression de la langue:', error);
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de supprimer la langue',
+          variant: 'destructive'
+        });
+      }
+    }
   };
 
   // Gérer l'activation/désactivation d'une langue
-  const handleToggleLanguageStatus = (id: string) => {
-    setLanguages(languages.map(language => 
-      language.id === id 
-        ? { ...language, isActive: !language.isActive } 
-        : language
-    ));
+  const handleToggleLanguageStatus = async (id: string) => {
+    try {
+      const updatedLanguage = await languageService.toggleStatus(id);
+
+      // Transformer les données pour correspondre à notre interface
+      const transformedLanguage = {
+        id: updatedLanguage.id,
+        code: updatedLanguage.code,
+        name: updatedLanguage.name,
+        native_name: updatedLanguage.native_name || '',
+        direction: updatedLanguage.direction,
+        is_default: updatedLanguage.is_default,
+        active: updatedLanguage.active
+      };
+
+      setLanguages(languages.map(language =>
+        language.id === id ? transformedLanguage : language
+      ));
+
+      toast({
+        title: 'Succès',
+        description: `La langue a été ${transformedLanguage.active ? 'activée' : 'désactivée'} avec succès`,
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors du changement de statut de la langue:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de changer le statut de la langue',
+        variant: 'destructive'
+      });
+    }
   };
 
   // Gérer le changement de langue par défaut
-  const handleSetDefaultLanguage = (id: string) => {
-    setLanguages(languages.map(language => ({
-      ...language,
-      isDefault: language.id === id
-    })));
-  };
+  const handleSetDefaultLanguage = async (id: string) => {
+    try {
+      const updatedLanguage = await languageService.setDefault(id);
 
-  // Gérer l'installation d'une langue
-  const handleInstallLanguage = (id: string) => {
-    setLanguages(languages.map(language => 
-      language.id === id 
-        ? { ...language, isInstalled: true, completionPercentage: 70 } 
-        : language
-    ));
+      // Mettre à jour toutes les langues pour refléter le changement de langue par défaut
+      const updatedLanguages = await languageService.getAll();
+
+      // Transformer les données pour correspondre à notre interface
+      const transformedLanguages = updatedLanguages.map(language => ({
+        id: language.id,
+        code: language.code,
+        name: language.name,
+        native_name: language.native_name || '',
+        direction: language.direction,
+        is_default: language.is_default,
+        active: language.active
+      }));
+
+      setLanguages(transformedLanguages);
+
+      toast({
+        title: 'Succès',
+        description: `La langue ${updatedLanguage.name} a été définie comme langue par défaut`,
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Erreur lors du changement de langue par défaut:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de changer la langue par défaut',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -178,7 +265,7 @@ const LanguagesSettings: React.FC = () => {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button 
+              <Button
                 className="bg-ivory-orange hover:bg-ivory-orange/90"
                 onClick={() => setEditingLanguage(null)}
               >
@@ -190,24 +277,24 @@ const LanguagesSettings: React.FC = () => {
               <DialogHeader>
                 <DialogTitle>{editingLanguage ? 'Modifier la langue' : 'Ajouter une langue'}</DialogTitle>
                 <DialogDescription>
-                  {editingLanguage 
-                    ? 'Modifiez les informations de la langue' 
+                  {editingLanguage
+                    ? 'Modifiez les informations de la langue'
                     : 'Remplissez les informations pour ajouter une nouvelle langue'}
                 </DialogDescription>
               </DialogHeader>
-              <LanguageForm 
-                language={editingLanguage || { 
-                  id: '', 
-                  code: '', 
-                  name: '', 
-                  nativeName: '',
-                  isDefault: false, 
-                  isActive: true,
-                  isInstalled: false,
-                  completionPercentage: 0
+              <LanguageForm
+                language={editingLanguage || {
+                  id: '',
+                  code: '',
+                  name: '',
+                  native_name: '',
+                  direction: 'ltr',
+                  is_default: false,
+                  active: true
                 }}
                 onSave={handleSaveLanguage}
                 onCancel={() => setIsDialogOpen(false)}
+                saving={saving}
               />
             </DialogContent>
           </Dialog>
@@ -226,101 +313,92 @@ const LanguagesSettings: React.FC = () => {
 
           {/* Tableau des langues */}
           <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Nom natif</TableHead>
-                  <TableHead>Par défaut</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Traduction</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLanguages.map((language) => (
-                  <TableRow key={language.id}>
-                    <TableCell className="font-medium">{language.code}</TableCell>
-                    <TableCell>{language.name}</TableCell>
-                    <TableCell>{language.nativeName}</TableCell>
-                    <TableCell>
-                      <Switch 
-                        checked={language.isDefault}
-                        onCheckedChange={() => handleSetDefaultLanguage(language.id)}
-                        disabled={language.isDefault || !language.isInstalled}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch 
-                          checked={language.isActive}
-                          onCheckedChange={() => handleToggleLanguageStatus(language.id)}
-                          disabled={!language.isInstalled || language.isDefault}
-                        />
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          !language.isInstalled 
-                            ? 'bg-gray-100 text-gray-800'
-                            : language.isActive 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {!language.isInstalled 
-                            ? 'Non installé' 
-                            : language.isActive 
-                              ? 'Actif' 
-                              : 'Inactif'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {language.isInstalled ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-ivory-orange" 
-                              style={{ width: `${language.completionPercentage}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs">{language.completionPercentage}%</span>
-                        </div>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleInstallLanguage(language.id)}
-                        >
-                          <Globe className="h-3 w-3 mr-1" />
-                          Installer
-                        </Button>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => {
-                            setEditingLanguage(language);
-                            setIsDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleDeleteLanguage(language.id)}
-                          disabled={language.isDefault || language.isInstalled}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-ivory-orange" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Nom natif</TableHead>
+                    <TableHead>Direction</TableHead>
+                    <TableHead>Par défaut</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredLanguages.length > 0 ? (
+                    filteredLanguages.map((language) => (
+                      <TableRow key={language.id}>
+                        <TableCell className="font-medium">{language.code}</TableCell>
+                        <TableCell>{language.name}</TableCell>
+                        <TableCell>{language.native_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {language.direction === 'rtl' ? 'Droite à gauche' : 'Gauche à droite'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={language.is_default}
+                            onCheckedChange={() => handleSetDefaultLanguage(language.id)}
+                            disabled={language.is_default || !language.active}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={language.active}
+                              onCheckedChange={() => handleToggleLanguageStatus(language.id)}
+                              disabled={language.is_default}
+                            />
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              language.active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {language.active ? 'Actif' : 'Inactif'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingLanguage(language);
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteLanguage(language.id)}
+                              disabled={language.is_default}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                        {searchTerm ? 'Aucune langue trouvée pour cette recherche' : 'Aucune langue disponible'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -333,13 +411,21 @@ interface LanguageFormProps {
   language: Language;
   onSave: (language: Language) => void;
   onCancel: () => void;
+  saving?: boolean;
 }
 
-const LanguageForm: React.FC<LanguageFormProps> = ({ language, onSave, onCancel }) => {
+const LanguageForm: React.FC<LanguageFormProps> = ({ language, onSave, onCancel, saving = false }) => {
   const [formData, setFormData] = useState<Language>(language);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
     setFormData({
       ...formData,
       [name]: value
@@ -362,7 +448,7 @@ const LanguageForm: React.FC<LanguageFormProps> = ({ language, onSave, onCancel 
             value={formData.code}
             onChange={handleChange}
             className="col-span-3"
-            placeholder="fr_FR"
+            placeholder="fr-FR"
             required
           />
         </div>
@@ -379,24 +465,64 @@ const LanguageForm: React.FC<LanguageFormProps> = ({ language, onSave, onCancel 
           />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="nativeName" className="text-right">Nom natif</Label>
+          <Label htmlFor="native_name" className="text-right">Nom natif</Label>
           <Input
-            id="nativeName"
-            name="nativeName"
-            value={formData.nativeName}
+            id="native_name"
+            name="native_name"
+            value={formData.native_name}
             onChange={handleChange}
             className="col-span-3"
             placeholder="Français"
-            required
           />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="direction" className="text-right">Direction</Label>
+          <Select
+            value={formData.direction}
+            onValueChange={(value) => handleSelectChange('direction', value as 'ltr' | 'rtl')}
+          >
+            <SelectTrigger className="col-span-3">
+              <SelectValue placeholder="Sélectionnez une direction" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ltr">Gauche à droite (LTR)</SelectItem>
+              <SelectItem value="rtl">Droite à gauche (RTL)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="active" className="text-right">Actif</Label>
+          <div className="col-span-3 flex items-center">
+            <Switch
+              id="active"
+              checked={formData.active}
+              onCheckedChange={(checked) => setFormData({...formData, active: checked})}
+            />
+          </div>
         </div>
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={saving}
+        >
           Annuler
         </Button>
-        <Button type="submit" className="bg-ivory-orange hover:bg-ivory-orange/90">
-          Enregistrer
+        <Button
+          type="submit"
+          className="bg-ivory-orange hover:bg-ivory-orange/90"
+          disabled={saving}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Enregistrement...
+            </>
+          ) : (
+            'Enregistrer'
+          )}
         </Button>
       </DialogFooter>
     </form>

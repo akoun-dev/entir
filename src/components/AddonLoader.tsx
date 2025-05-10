@@ -61,7 +61,51 @@ const AddonLoader: React.FC<AddonLoaderProps> = ({ children }) => {
   }, []);
 
   if (!loaded) {
-    return <div>Chargement des modules...</div>;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 'bold', color: '#555' }}>
+          Chargement ...
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#f59e0b', // Ajouter la couleur Orange pas defaut
+            animation: 'bounce 2s infinite ease-in-out',
+            animationDelay: '3s'
+          }} />
+          <div style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#f59e0b',
+            animation: 'bounce 2s infinite ease-in-out',
+            animationDelay: '3s'
+          }} />
+          <div style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: '#f59e0b',
+            animation: 'bounce 2s infinite ease-in-out',
+            animationDelay: '3s'
+          }} />
+        </div>
+        <style>
+          {`
+            @keyframes bounce {
+              0%, 80%, 100% {
+                transform: scale(0);
+              }
+              40% {
+                transform: scale(1);
+              }
+            }
+          `}
+        </style>
+      </div>
+    );
   }
 
   return <>{children}</>;
