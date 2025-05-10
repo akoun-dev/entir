@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -102,8 +103,8 @@ const ModulesListSettings: React.FC = () => {
     // Mettre à jour l'état avec les modules chargés
     if (addons && addons.length > 0) {
       const mappedModules = addons.map(addon => ({
-        id: addon.manifest.id,
-        name: addon.manifest.name,
+        id: addon.manifest.id || addon.manifest.name,
+        name: addon.manifest.displayName || addon.manifest.name,
         description: addon.manifest.description || 'Aucune description',
         version: addon.manifest.version || '1.0.0',
         author: addon.manifest.author || 'ENTIDR Team',

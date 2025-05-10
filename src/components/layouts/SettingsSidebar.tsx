@@ -123,7 +123,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Bell className="w-5 h-5" />,
       description: 'Configuration des notifications et alertes',
       items: [
-        { id: 'notifications_settings', name: 'Paramètres de notifications', icon: <Bell className="w-4 h-4" />, route: '/settings/notifications-settings' }
+        { id: 'notifications_settings', name: 'Paramètres de notifications', icon: <Bell className="w-4 h-4" />, route: '/settings/notifications' }
       ]
     },
     {
@@ -132,7 +132,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <FileText className="w-5 h-5" />,
       description: 'Configuration des audits et traçabilité',
       items: [
-        { id: 'audit_settings', name: 'Paramètres d\'audit', icon: <FileText className="w-4 h-4" />, route: '/settings/audit-settings' }
+        { id: 'audit_settings', name: 'Paramètres d\'audit', icon: <FileText className="w-4 h-4" />, route: '/settings/audit' }
       ]
     },
     {
@@ -141,7 +141,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Database className="w-5 h-5" />,
       description: 'Gestion des sauvegardes et restaurations',
       items: [
-        { id: 'backup_settings', name: 'Paramètres de sauvegarde', icon: <Database className="w-4 h-4" />, route: '/settings/backup-settings' }
+        { id: 'backup_settings', name: 'Paramètres de sauvegarde', icon: <Database className="w-4 h-4" />, route: '/settings/backup' }
       ]
     },
     {
@@ -150,7 +150,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <BarChart className="w-5 h-5" />,
       description: 'Personnalisation de l\'interface utilisateur',
       items: [
-        { id: 'appearance_settings', name: 'Paramètres d\'apparence', icon: <BarChart className="w-4 h-4" />, route: '/settings/appearance-settings' }
+        { id: 'appearance_settings', name: 'Paramètres d\'apparence', icon: <BarChart className="w-4 h-4" />, route: '/settings/appearance' }
       ]
     },
     {
@@ -159,7 +159,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Workflow className="w-5 h-5" />,
       description: 'Configuration des flux de travail automatisés',
       items: [
-        { id: 'workflow_settings', name: 'Paramètres de workflow', icon: <Workflow className="w-4 h-4" />, route: '/settings/workflow-settings' }
+        { id: 'workflow_settings', name: 'Paramètres de workflow', icon: <Workflow className="w-4 h-4" />, route: '/settings/workflows' }
       ]
     },
     {
@@ -168,7 +168,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Shield className="w-5 h-5" />,
       description: 'Gestion de la conformité réglementaire',
       items: [
-        { id: 'compliance_settings', name: 'Paramètres de conformité', icon: <Shield className="w-4 h-4" />, route: '/settings/compliance-settings' }
+        { id: 'compliance_settings', name: 'Paramètres de conformité', icon: <Shield className="w-4 h-4" />, route: '/settings/compliance' }
       ]
     },
     {
@@ -177,7 +177,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <FileSpreadsheet className="w-5 h-5" />,
       description: 'Configuration des outils d\'échange de données',
       items: [
-        { id: 'import_export_settings', name: 'Paramètres d\'import/export', icon: <FileSpreadsheet className="w-4 h-4" />, route: '/settings/import-export-settings' }
+        { id: 'import_export_settings', name: 'Paramètres d\'import/export', icon: <FileSpreadsheet className="w-4 h-4" />, route: '/settings/import-export' }
       ]
     },
     {
@@ -186,7 +186,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Calendar className="w-5 h-5" />,
       description: 'Configuration du système de calendrier',
       items: [
-        { id: 'calendar_settings', name: 'Paramètres de calendrier', icon: <Calendar className="w-4 h-4" />, route: '/settings/calendar-settings' }
+        { id: 'calendar_settings', name: 'Paramètres de calendrier', icon: <Calendar className="w-4 h-4" />, route: '/settings/calendar' }
       ]
     },
     {
@@ -195,7 +195,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Hash className="w-5 h-5" />,
       description: 'Gestion des numéros de séquence pour les documents',
       items: [
-        { id: 'sequences_settings', name: 'Paramètres de numération', icon: <Hash className="w-4 h-4" />, route: '/settings/sequences-settings' }
+        { id: 'sequences_settings', name: 'Paramètres de numération', icon: <Hash className="w-4 h-4" />, route: '/settings/sequences' }
       ]
     },
     {
@@ -204,7 +204,7 @@ const SettingsSidebar: React.FC = () => {
       icon: <Server className="w-5 h-5" />,
       description: 'Optimisation des performances du système',
       items: [
-        { id: 'performance_settings', name: 'Paramètres de performance', icon: <Server className="w-4 h-4" />, route: '/settings/performance-settings' }
+        { id: 'performance_settings', name: 'Paramètres de performance', icon: <Server className="w-4 h-4" />, route: '/settings/performance' }
       ]
     }
   ];
@@ -213,7 +213,8 @@ const SettingsSidebar: React.FC = () => {
   const isActive = (route: string) => location.pathname === route;
 
   // Vérifier si une catégorie est active (au moins un de ses items est actif)
-  const isCategoryActive = (items: any[]) => items.some(item => isActive(item.route) || location.pathname.startsWith(item.route));
+  type SettingsItem = { id: string; name: string; icon: JSX.Element; route: string };
+  const isCategoryActive = (items: SettingsItem[]) => items.some(item => isActive(item.route) || location.pathname.startsWith(item.route));
 
   // Gérer l'ouverture/fermeture des catégories
   const toggleCategory = (categoryId: string) => {
