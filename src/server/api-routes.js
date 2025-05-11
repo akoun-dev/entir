@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, Sequelize } = require('../models');
+const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, PaymentProvider, ShippingMethod, ExternalService, AuditLog, AuditConfig, Backup, BackupConfig, ThemeConfig, CustomLogo, ImportConfig, ExportConfig, ImportExportHistory, ComplianceConfig, ConsentRecord, Sequelize } = require('../models');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { Op } = Sequelize;
@@ -3730,6 +3730,1715 @@ router.post('/printers/:id/test', asyncHandler(async (req, res) => {
   };
 
   res.json(testResult);
+}));
+
+// Routes pour les fournisseurs de paiement
+router.get('/paymentproviders', asyncHandler(async (req, res) => {
+  const providers = await PaymentProvider.findAll({
+    order: [['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedProviders = providers.map(provider => ({
+    id: provider.id.toString(),
+    name: provider.name,
+    type: provider.type,
+    fees: provider.fees,
+    isActive: provider.isActive,
+    mode: provider.mode,
+    lastModified: provider.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedProviders);
+}));
+
+router.get('/paymentproviders/:id', asyncHandler(async (req, res) => {
+  const provider = await PaymentProvider.findByPk(req.params.id);
+
+  if (!provider) {
+    return res.status(404).json({ message: 'Fournisseur de paiement non trouvé' });
+  }
+
+  // Transformer les données
+  const transformedProvider = {
+    id: provider.id.toString(),
+    name: provider.name,
+    type: provider.type,
+    apiKey: provider.apiKey,
+    apiSecret: provider.apiSecret ? '••••••••••••••••' : null,
+    config: provider.config,
+    fees: provider.fees,
+    isActive: provider.isActive,
+    mode: provider.mode,
+    webhookUrl: provider.webhookUrl,
+    supportedMethods: provider.supportedMethods,
+    supportedCurrencies: provider.supportedCurrencies,
+    supportedCountries: provider.supportedCountries,
+    createdAt: provider.createdAt.toISOString(),
+    lastModified: provider.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedProvider);
+}));
+
+router.post('/paymentproviders', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    apiKey,
+    apiSecret,
+    config,
+    fees,
+    isActive,
+    mode,
+    webhookUrl,
+    supportedMethods,
+    supportedCurrencies,
+    supportedCountries
+  } = req.body;
+
+  // Créer le fournisseur de paiement
+  const provider = await PaymentProvider.create({
+    name,
+    type,
+    apiKey,
+    apiSecret,
+    config,
+    fees,
+    isActive: isActive !== undefined ? isActive : false,
+    mode: mode || 'test',
+    webhookUrl,
+    supportedMethods,
+    supportedCurrencies,
+    supportedCountries
+  });
+
+  // Transformer les données
+  const transformedProvider = {
+    id: provider.id.toString(),
+    name: provider.name,
+    type: provider.type,
+    fees: provider.fees,
+    isActive: provider.isActive,
+    mode: provider.mode,
+    lastModified: provider.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.status(201).json(transformedProvider);
+}));
+
+router.put('/paymentproviders/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    apiKey,
+    apiSecret,
+    config,
+    fees,
+    isActive,
+    mode,
+    webhookUrl,
+    supportedMethods,
+    supportedCurrencies,
+    supportedCountries
+  } = req.body;
+
+  const provider = await PaymentProvider.findByPk(req.params.id);
+  if (!provider) {
+    return res.status(404).json({ message: 'Fournisseur de paiement non trouvé' });
+  }
+
+  // Mettre à jour les champs
+  if (name) provider.name = name;
+  if (type) provider.type = type;
+  if (apiKey) provider.apiKey = apiKey;
+  if (apiSecret) provider.apiSecret = apiSecret;
+  if (config) provider.config = config;
+  if (fees) provider.fees = fees;
+  if (isActive !== undefined) provider.isActive = isActive;
+  if (mode) provider.mode = mode;
+  if (webhookUrl !== undefined) provider.webhookUrl = webhookUrl;
+  if (supportedMethods) provider.supportedMethods = supportedMethods;
+  if (supportedCurrencies) provider.supportedCurrencies = supportedCurrencies;
+  if (supportedCountries) provider.supportedCountries = supportedCountries;
+
+  await provider.save();
+
+  // Transformer les données
+  const transformedProvider = {
+    id: provider.id.toString(),
+    name: provider.name,
+    type: provider.type,
+    fees: provider.fees,
+    isActive: provider.isActive,
+    mode: provider.mode,
+    lastModified: provider.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedProvider);
+}));
+
+router.delete('/paymentproviders/:id', asyncHandler(async (req, res) => {
+  const provider = await PaymentProvider.findByPk(req.params.id);
+  if (!provider) {
+    return res.status(404).json({ message: 'Fournisseur de paiement non trouvé' });
+  }
+
+  await provider.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/paymentproviders/:id/toggle', asyncHandler(async (req, res) => {
+  const provider = await PaymentProvider.findByPk(req.params.id);
+  if (!provider) {
+    return res.status(404).json({ message: 'Fournisseur de paiement non trouvé' });
+  }
+
+  // Inverser l'état actif
+  provider.isActive = !provider.isActive;
+  await provider.save();
+
+  // Transformer les données
+  const transformedProvider = {
+    id: provider.id.toString(),
+    name: provider.name,
+    type: provider.type,
+    fees: provider.fees,
+    isActive: provider.isActive,
+    mode: provider.mode,
+    lastModified: provider.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedProvider);
+}));
+
+// Routes pour les méthodes d'expédition
+router.get('/shippingmethods', asyncHandler(async (req, res) => {
+  const methods = await ShippingMethod.findAll({
+    order: [['displayOrder', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedMethods = methods.map(method => ({
+    id: method.id.toString(),
+    name: method.name,
+    carrier: method.carrier,
+    deliveryTime: method.deliveryTime,
+    price: method.price,
+    isActive: method.isActive,
+    displayOrder: method.displayOrder,
+    lastModified: method.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedMethods);
+}));
+
+router.get('/shippingmethods/:id', asyncHandler(async (req, res) => {
+  const method = await ShippingMethod.findByPk(req.params.id);
+
+  if (!method) {
+    return res.status(404).json({ message: 'Méthode d\'expédition non trouvée' });
+  }
+
+  // Transformer les données
+  const transformedMethod = {
+    id: method.id.toString(),
+    name: method.name,
+    carrier: method.carrier,
+    deliveryTime: method.deliveryTime,
+    price: method.price,
+    isActive: method.isActive,
+    description: method.description,
+    pricingRules: method.pricingRules,
+    availableCountries: method.availableCountries,
+    maxWeight: method.maxWeight,
+    maxDimensions: method.maxDimensions,
+    trackingInfo: method.trackingInfo,
+    displayOrder: method.displayOrder,
+    createdAt: method.createdAt.toISOString(),
+    lastModified: method.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedMethod);
+}));
+
+router.post('/shippingmethods', asyncHandler(async (req, res) => {
+  const {
+    name,
+    carrier,
+    deliveryTime,
+    price,
+    isActive,
+    description,
+    pricingRules,
+    availableCountries,
+    maxWeight,
+    maxDimensions,
+    trackingInfo,
+    displayOrder
+  } = req.body;
+
+  // Créer la méthode d'expédition
+  const method = await ShippingMethod.create({
+    name,
+    carrier,
+    deliveryTime,
+    price,
+    isActive: isActive !== undefined ? isActive : false,
+    description,
+    pricingRules,
+    availableCountries,
+    maxWeight,
+    maxDimensions,
+    trackingInfo,
+    displayOrder: displayOrder || 0
+  });
+
+  // Transformer les données
+  const transformedMethod = {
+    id: method.id.toString(),
+    name: method.name,
+    carrier: method.carrier,
+    deliveryTime: method.deliveryTime,
+    price: method.price,
+    isActive: method.isActive,
+    displayOrder: method.displayOrder,
+    lastModified: method.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.status(201).json(transformedMethod);
+}));
+
+router.put('/shippingmethods/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    carrier,
+    deliveryTime,
+    price,
+    isActive,
+    description,
+    pricingRules,
+    availableCountries,
+    maxWeight,
+    maxDimensions,
+    trackingInfo,
+    displayOrder
+  } = req.body;
+
+  const method = await ShippingMethod.findByPk(req.params.id);
+  if (!method) {
+    return res.status(404).json({ message: 'Méthode d\'expédition non trouvée' });
+  }
+
+  // Mettre à jour les champs
+  if (name) method.name = name;
+  if (carrier) method.carrier = carrier;
+  if (deliveryTime) method.deliveryTime = deliveryTime;
+  if (price) method.price = price;
+  if (isActive !== undefined) method.isActive = isActive;
+  if (description !== undefined) method.description = description;
+  if (pricingRules) method.pricingRules = pricingRules;
+  if (availableCountries) method.availableCountries = availableCountries;
+  if (maxWeight !== undefined) method.maxWeight = maxWeight;
+  if (maxDimensions) method.maxDimensions = maxDimensions;
+  if (trackingInfo) method.trackingInfo = trackingInfo;
+  if (displayOrder !== undefined) method.displayOrder = displayOrder;
+
+  await method.save();
+
+  // Transformer les données
+  const transformedMethod = {
+    id: method.id.toString(),
+    name: method.name,
+    carrier: method.carrier,
+    deliveryTime: method.deliveryTime,
+    price: method.price,
+    isActive: method.isActive,
+    displayOrder: method.displayOrder,
+    lastModified: method.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedMethod);
+}));
+
+router.delete('/shippingmethods/:id', asyncHandler(async (req, res) => {
+  const method = await ShippingMethod.findByPk(req.params.id);
+  if (!method) {
+    return res.status(404).json({ message: 'Méthode d\'expédition non trouvée' });
+  }
+
+  await method.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/shippingmethods/:id/toggle', asyncHandler(async (req, res) => {
+  const method = await ShippingMethod.findByPk(req.params.id);
+  if (!method) {
+    return res.status(404).json({ message: 'Méthode d\'expédition non trouvée' });
+  }
+
+  // Inverser l'état actif
+  method.isActive = !method.isActive;
+  await method.save();
+
+  // Transformer les données
+  const transformedMethod = {
+    id: method.id.toString(),
+    name: method.name,
+    carrier: method.carrier,
+    deliveryTime: method.deliveryTime,
+    price: method.price,
+    isActive: method.isActive,
+    displayOrder: method.displayOrder,
+    lastModified: method.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedMethod);
+}));
+
+// Routes pour les services externes
+router.get('/externalservices', asyncHandler(async (req, res) => {
+  const services = await ExternalService.findAll({
+    order: [['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedServices = services.map(service => ({
+    id: service.id.toString(),
+    name: service.name,
+    type: service.type,
+    isActive: service.isActive,
+    mode: service.mode,
+    lastSyncStatus: service.lastSyncStatus,
+    lastSyncDate: service.lastSyncDate ? service.lastSyncDate.toISOString() : null,
+    lastModified: service.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedServices);
+}));
+
+router.get('/externalservices/:id', asyncHandler(async (req, res) => {
+  const service = await ExternalService.findByPk(req.params.id);
+
+  if (!service) {
+    return res.status(404).json({ message: 'Service externe non trouvé' });
+  }
+
+  // Transformer les données
+  const transformedService = {
+    id: service.id.toString(),
+    name: service.name,
+    type: service.type,
+    apiKey: service.apiKey,
+    apiSecret: service.apiSecret ? '••••••••••••••••' : null,
+    baseUrl: service.baseUrl,
+    config: service.config,
+    isActive: service.isActive,
+    mode: service.mode,
+    webhookUrl: service.webhookUrl,
+    authInfo: service.authInfo,
+    tokenExpiry: service.tokenExpiry ? service.tokenExpiry.toISOString() : null,
+    lastSyncStatus: service.lastSyncStatus,
+    lastSyncDate: service.lastSyncDate ? service.lastSyncDate.toISOString() : null,
+    createdAt: service.createdAt.toISOString(),
+    lastModified: service.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedService);
+}));
+
+router.post('/externalservices', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    apiKey,
+    apiSecret,
+    baseUrl,
+    config,
+    isActive,
+    mode,
+    webhookUrl,
+    authInfo
+  } = req.body;
+
+  // Créer le service externe
+  const service = await ExternalService.create({
+    name,
+    type,
+    apiKey,
+    apiSecret,
+    baseUrl,
+    config,
+    isActive: isActive !== undefined ? isActive : false,
+    mode: mode || 'test',
+    webhookUrl,
+    authInfo,
+    tokenExpiry: null,
+    lastSyncStatus: null,
+    lastSyncDate: null
+  });
+
+  // Transformer les données
+  const transformedService = {
+    id: service.id.toString(),
+    name: service.name,
+    type: service.type,
+    isActive: service.isActive,
+    mode: service.mode,
+    lastSyncStatus: service.lastSyncStatus,
+    lastSyncDate: service.lastSyncDate ? service.lastSyncDate.toISOString() : null,
+    lastModified: service.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.status(201).json(transformedService);
+}));
+
+router.put('/externalservices/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    apiKey,
+    apiSecret,
+    baseUrl,
+    config,
+    isActive,
+    mode,
+    webhookUrl,
+    authInfo
+  } = req.body;
+
+  const service = await ExternalService.findByPk(req.params.id);
+  if (!service) {
+    return res.status(404).json({ message: 'Service externe non trouvé' });
+  }
+
+  // Mettre à jour les champs
+  if (name) service.name = name;
+  if (type) service.type = type;
+  if (apiKey) service.apiKey = apiKey;
+  if (apiSecret) service.apiSecret = apiSecret;
+  if (baseUrl !== undefined) service.baseUrl = baseUrl;
+  if (config) service.config = config;
+  if (isActive !== undefined) service.isActive = isActive;
+  if (mode) service.mode = mode;
+  if (webhookUrl !== undefined) service.webhookUrl = webhookUrl;
+  if (authInfo) service.authInfo = authInfo;
+
+  await service.save();
+
+  // Transformer les données
+  const transformedService = {
+    id: service.id.toString(),
+    name: service.name,
+    type: service.type,
+    isActive: service.isActive,
+    mode: service.mode,
+    lastSyncStatus: service.lastSyncStatus,
+    lastSyncDate: service.lastSyncDate ? service.lastSyncDate.toISOString() : null,
+    lastModified: service.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedService);
+}));
+
+router.delete('/externalservices/:id', asyncHandler(async (req, res) => {
+  const service = await ExternalService.findByPk(req.params.id);
+  if (!service) {
+    return res.status(404).json({ message: 'Service externe non trouvé' });
+  }
+
+  await service.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/externalservices/:id/toggle', asyncHandler(async (req, res) => {
+  const service = await ExternalService.findByPk(req.params.id);
+  if (!service) {
+    return res.status(404).json({ message: 'Service externe non trouvé' });
+  }
+
+  // Inverser l'état actif
+  service.isActive = !service.isActive;
+  await service.save();
+
+  // Transformer les données
+  const transformedService = {
+    id: service.id.toString(),
+    name: service.name,
+    type: service.type,
+    isActive: service.isActive,
+    mode: service.mode,
+    lastSyncStatus: service.lastSyncStatus,
+    lastSyncDate: service.lastSyncDate ? service.lastSyncDate.toISOString() : null,
+    lastModified: service.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedService);
+}));
+
+router.post('/externalservices/:id/sync', asyncHandler(async (req, res) => {
+  const service = await ExternalService.findByPk(req.params.id);
+  if (!service) {
+    return res.status(404).json({ message: 'Service externe non trouvé' });
+  }
+
+  // Simuler une synchronisation (dans une vraie application, cela effectuerait réellement une synchronisation avec le service externe)
+  // Ici, nous mettons simplement à jour les champs lastSyncStatus et lastSyncDate
+
+  service.lastSyncStatus = 'success';
+  service.lastSyncDate = new Date();
+  await service.save();
+
+  // Transformer les données
+  const transformedService = {
+    id: service.id.toString(),
+    name: service.name,
+    type: service.type,
+    isActive: service.isActive,
+    mode: service.mode,
+    lastSyncStatus: service.lastSyncStatus,
+    lastSyncDate: service.lastSyncDate ? service.lastSyncDate.toISOString() : null,
+    lastModified: service.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedService);
+}));
+
+// Routes pour l'audit
+router.get('/auditlogs', asyncHandler(async (req, res) => {
+  const logs = await AuditLog.findAll({
+    include: [{ model: User, as: 'user' }],
+    order: [['timestamp', 'DESC']],
+    limit: 100
+  });
+
+  // Transformer les données
+  const transformedLogs = logs.map(log => ({
+    id: log.id.toString(),
+    date: log.timestamp.toISOString(),
+    user: log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Système',
+    action: log.action,
+    target: `${log.targetType}${log.targetId ? ` #${log.targetId}` : ''}`,
+    targetDescription: log.targetDescription || '',
+    details: log.details || '',
+    severity: log.severity,
+    status: log.status,
+    ipAddress: log.ipAddress || '',
+    userAgent: log.userAgent || ''
+  }));
+
+  res.json(transformedLogs);
+}));
+
+router.get('/auditlogs/filter', asyncHandler(async (req, res) => {
+  const { action, severity, userId, startDate, endDate, limit } = req.query;
+
+  const whereClause = {};
+
+  if (action) whereClause.action = action;
+  if (severity) whereClause.severity = severity;
+  if (userId) whereClause.userId = userId;
+
+  if (startDate || endDate) {
+    whereClause.timestamp = {};
+    if (startDate) whereClause.timestamp[Op.gte] = new Date(startDate);
+    if (endDate) whereClause.timestamp[Op.lte] = new Date(endDate);
+  }
+
+  const logs = await AuditLog.findAll({
+    where: whereClause,
+    include: [{ model: User, as: 'user' }],
+    order: [['timestamp', 'DESC']],
+    limit: limit ? parseInt(limit) : 100
+  });
+
+  // Transformer les données
+  const transformedLogs = logs.map(log => ({
+    id: log.id.toString(),
+    date: log.timestamp.toISOString(),
+    user: log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Système',
+    action: log.action,
+    target: `${log.targetType}${log.targetId ? ` #${log.targetId}` : ''}`,
+    targetDescription: log.targetDescription || '',
+    details: log.details || '',
+    severity: log.severity,
+    status: log.status,
+    ipAddress: log.ipAddress || '',
+    userAgent: log.userAgent || ''
+  }));
+
+  res.json(transformedLogs);
+}));
+
+router.get('/auditconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration d'audit (il ne devrait y avoir qu'une seule entrée)
+  let config = await AuditConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await AuditConfig.create({
+      retentionDays: 90,
+      logLevel: 'normal',
+      monitoredEvents: ['login', 'data_change', 'permission_change'],
+      alertEnabled: true,
+      alertThreshold: 5,
+      logSensitiveDataAccess: true,
+      logDataChanges: true,
+      logAuthentication: true,
+      logPermissionChanges: true,
+      logAdminActions: true
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    retentionDays: config.retentionDays,
+    logLevel: config.logLevel,
+    monitoredEvents: config.monitoredEvents,
+    alertEnabled: config.alertEnabled,
+    alertThreshold: config.alertThreshold,
+    alertEmails: config.alertEmails,
+    logSensitiveDataAccess: config.logSensitiveDataAccess,
+    logDataChanges: config.logDataChanges,
+    logAuthentication: config.logAuthentication,
+    logPermissionChanges: config.logPermissionChanges,
+    logAdminActions: config.logAdminActions
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/auditconfig', asyncHandler(async (req, res) => {
+  const {
+    retentionDays,
+    logLevel,
+    monitoredEvents,
+    alertEnabled,
+    alertThreshold,
+    alertEmails,
+    logSensitiveDataAccess,
+    logDataChanges,
+    logAuthentication,
+    logPermissionChanges,
+    logAdminActions
+  } = req.body;
+
+  // Récupérer la configuration d'audit (il ne devrait y avoir qu'une seule entrée)
+  let config = await AuditConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await AuditConfig.create({
+      retentionDays: retentionDays || 90,
+      logLevel: logLevel || 'normal',
+      monitoredEvents: monitoredEvents || ['login', 'data_change', 'permission_change'],
+      alertEnabled: alertEnabled !== undefined ? alertEnabled : true,
+      alertThreshold: alertThreshold || 5,
+      alertEmails: alertEmails || null,
+      logSensitiveDataAccess: logSensitiveDataAccess !== undefined ? logSensitiveDataAccess : true,
+      logDataChanges: logDataChanges !== undefined ? logDataChanges : true,
+      logAuthentication: logAuthentication !== undefined ? logAuthentication : true,
+      logPermissionChanges: logPermissionChanges !== undefined ? logPermissionChanges : true,
+      logAdminActions: logAdminActions !== undefined ? logAdminActions : true
+    });
+  } else {
+    // Mettre à jour les champs
+    if (retentionDays !== undefined) config.retentionDays = retentionDays;
+    if (logLevel) config.logLevel = logLevel;
+    if (monitoredEvents) config.monitoredEvents = monitoredEvents;
+    if (alertEnabled !== undefined) config.alertEnabled = alertEnabled;
+    if (alertThreshold !== undefined) config.alertThreshold = alertThreshold;
+    if (alertEmails !== undefined) config.alertEmails = alertEmails;
+    if (logSensitiveDataAccess !== undefined) config.logSensitiveDataAccess = logSensitiveDataAccess;
+    if (logDataChanges !== undefined) config.logDataChanges = logDataChanges;
+    if (logAuthentication !== undefined) config.logAuthentication = logAuthentication;
+    if (logPermissionChanges !== undefined) config.logPermissionChanges = logPermissionChanges;
+    if (logAdminActions !== undefined) config.logAdminActions = logAdminActions;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    retentionDays: config.retentionDays,
+    logLevel: config.logLevel,
+    monitoredEvents: config.monitoredEvents,
+    alertEnabled: config.alertEnabled,
+    alertThreshold: config.alertThreshold,
+    alertEmails: config.alertEmails,
+    logSensitiveDataAccess: config.logSensitiveDataAccess,
+    logDataChanges: config.logDataChanges,
+    logAuthentication: config.logAuthentication,
+    logPermissionChanges: config.logPermissionChanges,
+    logAdminActions: config.logAdminActions
+  };
+
+  res.json(transformedConfig);
+}));
+
+// Routes pour les sauvegardes
+router.get('/backups', asyncHandler(async (req, res) => {
+  const backups = await Backup.findAll({
+    include: [
+      { model: User, as: 'user' }
+    ],
+    order: [['timestamp', 'DESC']]
+  });
+
+  // Transformer les données
+  const transformedBackups = backups.map(backup => ({
+    id: backup.id.toString(),
+    name: backup.name,
+    timestamp: backup.timestamp.toISOString(),
+    type: backup.type,
+    size: backup.size ? formatFileSize(backup.size) : 'N/A',
+    storageLocation: backup.storageLocation,
+    status: backup.status,
+    user: backup.user ? `${backup.user.firstName} ${backup.user.lastName}` : 'Système',
+    encrypted: backup.encrypted,
+    expiresAt: backup.expiresAt ? backup.expiresAt.toISOString() : null,
+    restored: backup.restored,
+    restoredAt: backup.restoredAt ? backup.restoredAt.toISOString() : null
+  }));
+
+  res.json(transformedBackups);
+}));
+
+router.get('/backups/:id', asyncHandler(async (req, res) => {
+  const backup = await Backup.findByPk(req.params.id, {
+    include: [
+      { model: User, as: 'user' }
+    ]
+  });
+
+  if (!backup) {
+    return res.status(404).json({ message: 'Sauvegarde non trouvée' });
+  }
+
+  // Transformer les données
+  const transformedBackup = {
+    id: backup.id.toString(),
+    name: backup.name,
+    timestamp: backup.timestamp.toISOString(),
+    type: backup.type,
+    size: backup.size ? formatFileSize(backup.size) : 'N/A',
+    storageLocation: backup.storageLocation,
+    localPath: backup.localPath,
+    cloudPath: backup.cloudPath,
+    status: backup.status,
+    errorDetails: backup.errorDetails,
+    user: backup.user ? `${backup.user.firstName} ${backup.user.lastName}` : 'Système',
+    encrypted: backup.encrypted,
+    encryptionKeyId: backup.encryptionKeyId,
+    content: backup.content,
+    checksum: backup.checksum,
+    expiresAt: backup.expiresAt ? backup.expiresAt.toISOString() : null,
+    restored: backup.restored,
+    restoredAt: backup.restoredAt ? backup.restoredAt.toISOString() : null,
+    restoredByUser: backup.restoredByUserId ? 'Utilisateur #' + backup.restoredByUserId : null
+  };
+
+  res.json(transformedBackup);
+}));
+
+router.post('/backups/create', asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+
+  // Simuler la création d'une sauvegarde (dans une vraie application, cela déclencherait un processus de sauvegarde)
+  const now = new Date();
+  const backupName = `backup_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+
+  // Récupérer la configuration de sauvegarde
+  const config = await BackupConfig.findOne();
+
+  // Calculer la date d'expiration
+  const expiresAt = new Date(now);
+  expiresAt.setDate(expiresAt.getDate() + (config ? config.retention : 30));
+
+  // Créer l'entrée de sauvegarde
+  const backup = await Backup.create({
+    name: backupName,
+    timestamp: now,
+    type: 'manual',
+    size: Math.floor(Math.random() * 1024 * 1024 * 100), // Taille aléatoire pour la démo
+    storageLocation: config ? config.storageType : 'local',
+    localPath: `/var/backups/app/${backupName}.zip`,
+    cloudPath: config && (config.storageType === 'cloud' || config.storageType === 'both') ? `s3://app-backups/manual/${backupName}.zip` : null,
+    status: 'success',
+    userId: userId || null,
+    encrypted: config ? config.encryption : true,
+    encryptionKeyId: config && config.encryption ? 'key-1' : null,
+    content: JSON.stringify({
+      tables: ['Users', 'Groups', 'Parameters', 'AuditLogs'],
+      files: ['uploads', 'config']
+    }),
+    checksum: 'sha256:' + crypto.randomBytes(32).toString('hex'),
+    expiresAt
+  });
+
+  // Mettre à jour la configuration de sauvegarde
+  if (config) {
+    config.lastBackup = now;
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedBackup = {
+    id: backup.id.toString(),
+    name: backup.name,
+    timestamp: backup.timestamp.toISOString(),
+    type: backup.type,
+    size: formatFileSize(backup.size),
+    storageLocation: backup.storageLocation,
+    status: backup.status,
+    user: userId ? 'Utilisateur #' + userId : 'Système',
+    encrypted: backup.encrypted,
+    expiresAt: backup.expiresAt.toISOString(),
+    restored: backup.restored
+  };
+
+  res.status(201).json(transformedBackup);
+}));
+
+router.post('/backups/:id/restore', asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+
+  const backup = await Backup.findByPk(req.params.id);
+  if (!backup) {
+    return res.status(404).json({ message: 'Sauvegarde non trouvée' });
+  }
+
+  // Vérifier si la sauvegarde est valide
+  if (backup.status !== 'success') {
+    return res.status(400).json({ message: 'Impossible de restaurer une sauvegarde qui n\'a pas réussi' });
+  }
+
+  // Simuler la restauration (dans une vraie application, cela déclencherait un processus de restauration)
+  backup.restored = true;
+  backup.restoredAt = new Date();
+  backup.restoredByUserId = userId || null;
+  await backup.save();
+
+  // Transformer les données
+  const transformedBackup = {
+    id: backup.id.toString(),
+    name: backup.name,
+    timestamp: backup.timestamp.toISOString(),
+    type: backup.type,
+    size: formatFileSize(backup.size),
+    storageLocation: backup.storageLocation,
+    status: backup.status,
+    user: backup.userId ? 'Utilisateur #' + backup.userId : 'Système',
+    encrypted: backup.encrypted,
+    expiresAt: backup.expiresAt ? backup.expiresAt.toISOString() : null,
+    restored: backup.restored,
+    restoredAt: backup.restoredAt.toISOString(),
+    restoredByUser: userId ? 'Utilisateur #' + userId : 'Système'
+  };
+
+  res.json(transformedBackup);
+}));
+
+router.get('/backupconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration de sauvegarde (il ne devrait y avoir qu'une seule entrée)
+  let config = await BackupConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await BackupConfig.create({
+      frequency: 'daily',
+      backupTime: '02:00',
+      weeklyDay: 0, // Dimanche
+      monthlyDay: 1, // Premier jour du mois
+      retention: 30,
+      storageType: 'both',
+      localPath: '/var/backups/app',
+      cloudConfig: JSON.stringify({
+        provider: 'aws',
+        bucket: 'app-backups',
+        region: 'eu-west-1',
+        prefix: 'daily/'
+      }),
+      encryption: true,
+      encryptionKey: 'encrypted_key_placeholder',
+      emailNotifications: true,
+      notificationEmails: JSON.stringify(['admin@example.com'])
+    });
+  }
+
+  // Calculer la prochaine sauvegarde
+  let nextBackup = null;
+  if (!config.nextBackup) {
+    nextBackup = calculateNextBackup(config);
+    config.nextBackup = nextBackup;
+    await config.save();
+  } else {
+    nextBackup = config.nextBackup;
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    frequency: config.frequency,
+    backupTime: config.backupTime,
+    weeklyDay: config.weeklyDay,
+    monthlyDay: config.monthlyDay,
+    retention: config.retention,
+    storageType: config.storageType,
+    localPath: config.localPath,
+    cloudConfig: config.cloudConfig,
+    encryption: config.encryption,
+    lastBackup: config.lastBackup ? config.lastBackup.toISOString() : null,
+    nextBackup: config.nextBackup ? config.nextBackup.toISOString() : null,
+    lastBackupStatus: config.lastBackupStatus,
+    emailNotifications: config.emailNotifications,
+    notificationEmails: config.notificationEmails
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/backupconfig', asyncHandler(async (req, res) => {
+  const {
+    frequency,
+    backupTime,
+    weeklyDay,
+    monthlyDay,
+    retention,
+    storageType,
+    localPath,
+    cloudConfig,
+    encryption,
+    emailNotifications,
+    notificationEmails
+  } = req.body;
+
+  // Récupérer la configuration de sauvegarde (il ne devrait y avoir qu'une seule entrée)
+  let config = await BackupConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await BackupConfig.create({
+      frequency: frequency || 'daily',
+      backupTime: backupTime || '02:00',
+      weeklyDay: weeklyDay !== undefined ? weeklyDay : 0,
+      monthlyDay: monthlyDay !== undefined ? monthlyDay : 1,
+      retention: retention || 30,
+      storageType: storageType || 'both',
+      localPath: localPath || '/var/backups/app',
+      cloudConfig: cloudConfig || JSON.stringify({
+        provider: 'aws',
+        bucket: 'app-backups',
+        region: 'eu-west-1',
+        prefix: 'daily/'
+      }),
+      encryption: encryption !== undefined ? encryption : true,
+      encryptionKey: 'encrypted_key_placeholder',
+      emailNotifications: emailNotifications !== undefined ? emailNotifications : true,
+      notificationEmails: notificationEmails || JSON.stringify(['admin@example.com'])
+    });
+  } else {
+    // Mettre à jour les champs
+    if (frequency) config.frequency = frequency;
+    if (backupTime) config.backupTime = backupTime;
+    if (weeklyDay !== undefined) config.weeklyDay = weeklyDay;
+    if (monthlyDay !== undefined) config.monthlyDay = monthlyDay;
+    if (retention !== undefined) config.retention = retention;
+    if (storageType) config.storageType = storageType;
+    if (localPath) config.localPath = localPath;
+    if (cloudConfig) config.cloudConfig = cloudConfig;
+    if (encryption !== undefined) config.encryption = encryption;
+    if (emailNotifications !== undefined) config.emailNotifications = emailNotifications;
+    if (notificationEmails) config.notificationEmails = notificationEmails;
+
+    // Recalculer la prochaine sauvegarde
+    config.nextBackup = calculateNextBackup(config);
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    frequency: config.frequency,
+    backupTime: config.backupTime,
+    weeklyDay: config.weeklyDay,
+    monthlyDay: config.monthlyDay,
+    retention: config.retention,
+    storageType: config.storageType,
+    localPath: config.localPath,
+    cloudConfig: config.cloudConfig,
+    encryption: config.encryption,
+    lastBackup: config.lastBackup ? config.lastBackup.toISOString() : null,
+    nextBackup: config.nextBackup ? config.nextBackup.toISOString() : null,
+    lastBackupStatus: config.lastBackupStatus,
+    emailNotifications: config.emailNotifications,
+    notificationEmails: config.notificationEmails
+  };
+
+  res.json(transformedConfig);
+}));
+
+// Fonction utilitaire pour formater la taille des fichiers
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Fonction utilitaire pour calculer la prochaine sauvegarde
+function calculateNextBackup(config) {
+  const now = new Date();
+  const [hours, minutes] = config.backupTime.split(':').map(Number);
+
+  let nextBackup = new Date(now);
+  nextBackup.setHours(hours, minutes, 0, 0);
+
+  // Si l'heure est déjà passée aujourd'hui, passer au jour suivant
+  if (nextBackup <= now) {
+    nextBackup.setDate(nextBackup.getDate() + 1);
+  }
+
+  // Ajuster en fonction de la fréquence
+  if (config.frequency === 'weekly') {
+    // Trouver le prochain jour de la semaine correspondant
+    const currentDay = nextBackup.getDay();
+    const daysToAdd = (config.weeklyDay - currentDay + 7) % 7;
+
+    if (daysToAdd > 0 || (daysToAdd === 0 && nextBackup <= now)) {
+      nextBackup.setDate(nextBackup.getDate() + daysToAdd);
+    }
+  } else if (config.frequency === 'monthly') {
+    // Trouver le prochain jour du mois correspondant
+    const currentDate = nextBackup.getDate();
+
+    if (currentDate > config.monthlyDay || (currentDate === config.monthlyDay && nextBackup <= now)) {
+      // Passer au mois suivant
+      nextBackup.setMonth(nextBackup.getMonth() + 1);
+    }
+
+    // Définir le jour du mois
+    nextBackup.setDate(config.monthlyDay);
+
+    // Vérifier si le jour existe dans le mois (par exemple, le 31 février n'existe pas)
+    const month = nextBackup.getMonth();
+    nextBackup.setDate(config.monthlyDay);
+
+    // Si le mois a changé, c'est que le jour n'existe pas dans ce mois
+    if (nextBackup.getMonth() !== month) {
+      // Revenir au dernier jour du mois précédent
+      nextBackup = new Date(nextBackup.getFullYear(), month + 1, 0, hours, minutes, 0, 0);
+    }
+  }
+
+  return nextBackup;
+}
+
+// Routes pour la catégorie "Apparences"
+router.get('/themeconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration du thème (il ne devrait y avoir qu'une seule entrée)
+  let config = await ThemeConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ThemeConfig.create({
+      mode: 'light',
+      primaryColor: '#3b82f6',
+      secondaryColor: '#10b981',
+      density: 'normal',
+      fontSize: 'medium',
+      highContrast: false,
+      reducedMotion: false,
+      dashboardLayout: 'default'
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    mode: config.mode,
+    primaryColor: config.primaryColor,
+    secondaryColor: config.secondaryColor,
+    density: config.density,
+    fontSize: config.fontSize,
+    highContrast: config.highContrast,
+    reducedMotion: config.reducedMotion,
+    dashboardLayout: config.dashboardLayout,
+    customCSS: config.customCSS,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/themeconfig', asyncHandler(async (req, res) => {
+  const {
+    mode,
+    primaryColor,
+    secondaryColor,
+    density,
+    fontSize,
+    highContrast,
+    reducedMotion,
+    dashboardLayout,
+    customCSS,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration du thème (il ne devrait y avoir qu'une seule entrée)
+  let config = await ThemeConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ThemeConfig.create({
+      mode: mode || 'light',
+      primaryColor: primaryColor || '#3b82f6',
+      secondaryColor: secondaryColor || '#10b981',
+      density: density || 'normal',
+      fontSize: fontSize || 'medium',
+      highContrast: highContrast !== undefined ? highContrast : false,
+      reducedMotion: reducedMotion !== undefined ? reducedMotion : false,
+      dashboardLayout: dashboardLayout || 'default',
+      customCSS: customCSS || null,
+      advancedSettings: advancedSettings || null
+    });
+  } else {
+    // Mettre à jour les champs
+    if (mode) config.mode = mode;
+    if (primaryColor) config.primaryColor = primaryColor;
+    if (secondaryColor !== undefined) config.secondaryColor = secondaryColor;
+    if (density) config.density = density;
+    if (fontSize) config.fontSize = fontSize;
+    if (highContrast !== undefined) config.highContrast = highContrast;
+    if (reducedMotion !== undefined) config.reducedMotion = reducedMotion;
+    if (dashboardLayout) config.dashboardLayout = dashboardLayout;
+    if (customCSS !== undefined) config.customCSS = customCSS;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    mode: config.mode,
+    primaryColor: config.primaryColor,
+    secondaryColor: config.secondaryColor,
+    density: config.density,
+    fontSize: config.fontSize,
+    highContrast: config.highContrast,
+    reducedMotion: config.reducedMotion,
+    dashboardLayout: config.dashboardLayout,
+    customCSS: config.customCSS,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/customlogos', asyncHandler(async (req, res) => {
+  const logos = await CustomLogo.findAll({
+    where: { active: true },
+    order: [['type', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedLogos = logos.map(logo => ({
+    id: logo.id.toString(),
+    type: logo.type,
+    filePath: logo.filePath,
+    originalFilename: logo.originalFilename,
+    mimeType: logo.mimeType,
+    fileSize: logo.fileSize,
+    dimensions: logo.dimensions,
+    active: logo.active,
+    metadata: logo.metadata
+  }));
+
+  res.json(transformedLogos);
+}));
+
+router.get('/customlogos/:type', asyncHandler(async (req, res) => {
+  const logo = await CustomLogo.findOne({
+    where: {
+      type: req.params.type,
+      active: true
+    }
+  });
+
+  if (!logo) {
+    return res.status(404).json({ message: 'Logo non trouvé' });
+  }
+
+  // Transformer les données
+  const transformedLogo = {
+    id: logo.id.toString(),
+    type: logo.type,
+    filePath: logo.filePath,
+    originalFilename: logo.originalFilename,
+    mimeType: logo.mimeType,
+    fileSize: logo.fileSize,
+    dimensions: logo.dimensions,
+    active: logo.active,
+    metadata: logo.metadata
+  };
+
+  res.json(transformedLogo);
+}));
+
+// Routes pour la catégorie "Import/export"
+router.get('/importconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration d'import (il ne devrait y avoir qu'une seule entrée)
+  let config = await ImportConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ImportConfig.create({
+      allowedFormats: ['csv', 'xlsx', 'xml', 'json'],
+      maxFileSize: 10485760, // 10 MB
+      defaultDelimiter: ',',
+      defaultEncoding: 'UTF-8',
+      validateBeforeImport: true,
+      ignoreErrors: false,
+      emailNotifications: true
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    allowedFormats: config.allowedFormats,
+    maxFileSize: config.maxFileSize,
+    defaultDelimiter: config.defaultDelimiter,
+    defaultEncoding: config.defaultEncoding,
+    validateBeforeImport: config.validateBeforeImport,
+    ignoreErrors: config.ignoreErrors,
+    maxRows: config.maxRows,
+    tempDirectory: config.tempDirectory,
+    emailNotifications: config.emailNotifications,
+    notificationEmails: config.notificationEmails,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/importconfig', asyncHandler(async (req, res) => {
+  const {
+    allowedFormats,
+    maxFileSize,
+    defaultDelimiter,
+    defaultEncoding,
+    validateBeforeImport,
+    ignoreErrors,
+    maxRows,
+    tempDirectory,
+    emailNotifications,
+    notificationEmails,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration d'import (il ne devrait y avoir qu'une seule entrée)
+  let config = await ImportConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ImportConfig.create({
+      allowedFormats: allowedFormats || ['csv', 'xlsx', 'xml', 'json'],
+      maxFileSize: maxFileSize || 10485760,
+      defaultDelimiter: defaultDelimiter || ',',
+      defaultEncoding: defaultEncoding || 'UTF-8',
+      validateBeforeImport: validateBeforeImport !== undefined ? validateBeforeImport : true,
+      ignoreErrors: ignoreErrors !== undefined ? ignoreErrors : false,
+      maxRows: maxRows || null,
+      tempDirectory: tempDirectory || '/tmp/imports',
+      emailNotifications: emailNotifications !== undefined ? emailNotifications : true,
+      notificationEmails: notificationEmails || null,
+      advancedSettings: advancedSettings || null
+    });
+  } else {
+    // Mettre à jour les champs
+    if (allowedFormats) config.allowedFormats = allowedFormats;
+    if (maxFileSize !== undefined) config.maxFileSize = maxFileSize;
+    if (defaultDelimiter) config.defaultDelimiter = defaultDelimiter;
+    if (defaultEncoding) config.defaultEncoding = defaultEncoding;
+    if (validateBeforeImport !== undefined) config.validateBeforeImport = validateBeforeImport;
+    if (ignoreErrors !== undefined) config.ignoreErrors = ignoreErrors;
+    if (maxRows !== undefined) config.maxRows = maxRows;
+    if (tempDirectory) config.tempDirectory = tempDirectory;
+    if (emailNotifications !== undefined) config.emailNotifications = emailNotifications;
+    if (notificationEmails !== undefined) config.notificationEmails = notificationEmails;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    allowedFormats: config.allowedFormats,
+    maxFileSize: config.maxFileSize,
+    defaultDelimiter: config.defaultDelimiter,
+    defaultEncoding: config.defaultEncoding,
+    validateBeforeImport: config.validateBeforeImport,
+    ignoreErrors: config.ignoreErrors,
+    maxRows: config.maxRows,
+    tempDirectory: config.tempDirectory,
+    emailNotifications: config.emailNotifications,
+    notificationEmails: config.notificationEmails,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/exportconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration d'export (il ne devrait y avoir qu'une seule entrée)
+  let config = await ExportConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ExportConfig.create({
+      availableFormats: ['csv', 'xlsx', 'xml', 'json', 'pdf'],
+      defaultFormat: 'xlsx',
+      defaultDelimiter: ',',
+      defaultEncoding: 'UTF-8',
+      includeHeaders: true,
+      compressExports: true,
+      emailNotifications: true
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    availableFormats: config.availableFormats,
+    defaultFormat: config.defaultFormat,
+    defaultDelimiter: config.defaultDelimiter,
+    defaultEncoding: config.defaultEncoding,
+    includeHeaders: config.includeHeaders,
+    maxRows: config.maxRows,
+    tempDirectory: config.tempDirectory,
+    compressExports: config.compressExports,
+    dateFormat: config.dateFormat,
+    emailNotifications: config.emailNotifications,
+    notificationEmails: config.notificationEmails,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/exportconfig', asyncHandler(async (req, res) => {
+  const {
+    availableFormats,
+    defaultFormat,
+    defaultDelimiter,
+    defaultEncoding,
+    includeHeaders,
+    maxRows,
+    tempDirectory,
+    compressExports,
+    dateFormat,
+    emailNotifications,
+    notificationEmails,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration d'export (il ne devrait y avoir qu'une seule entrée)
+  let config = await ExportConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ExportConfig.create({
+      availableFormats: availableFormats || ['csv', 'xlsx', 'xml', 'json', 'pdf'],
+      defaultFormat: defaultFormat || 'xlsx',
+      defaultDelimiter: defaultDelimiter || ',',
+      defaultEncoding: defaultEncoding || 'UTF-8',
+      includeHeaders: includeHeaders !== undefined ? includeHeaders : true,
+      maxRows: maxRows || 100000,
+      tempDirectory: tempDirectory || '/tmp/exports',
+      compressExports: compressExports !== undefined ? compressExports : true,
+      dateFormat: dateFormat || 'YYYY-MM-DD',
+      emailNotifications: emailNotifications !== undefined ? emailNotifications : true,
+      notificationEmails: notificationEmails || null,
+      advancedSettings: advancedSettings || null
+    });
+  } else {
+    // Mettre à jour les champs
+    if (availableFormats) config.availableFormats = availableFormats;
+    if (defaultFormat) config.defaultFormat = defaultFormat;
+    if (defaultDelimiter) config.defaultDelimiter = defaultDelimiter;
+    if (defaultEncoding) config.defaultEncoding = defaultEncoding;
+    if (includeHeaders !== undefined) config.includeHeaders = includeHeaders;
+    if (maxRows !== undefined) config.maxRows = maxRows;
+    if (tempDirectory) config.tempDirectory = tempDirectory;
+    if (compressExports !== undefined) config.compressExports = compressExports;
+    if (dateFormat) config.dateFormat = dateFormat;
+    if (emailNotifications !== undefined) config.emailNotifications = emailNotifications;
+    if (notificationEmails !== undefined) config.notificationEmails = notificationEmails;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    availableFormats: config.availableFormats,
+    defaultFormat: config.defaultFormat,
+    defaultDelimiter: config.defaultDelimiter,
+    defaultEncoding: config.defaultEncoding,
+    includeHeaders: config.includeHeaders,
+    maxRows: config.maxRows,
+    tempDirectory: config.tempDirectory,
+    compressExports: config.compressExports,
+    dateFormat: config.dateFormat,
+    emailNotifications: config.emailNotifications,
+    notificationEmails: config.notificationEmails,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/importexporthistory', asyncHandler(async (req, res) => {
+  const history = await ImportExportHistory.findAll({
+    include: [{ model: User, as: 'user' }],
+    order: [['timestamp', 'DESC']],
+    limit: 100
+  });
+
+  // Transformer les données
+  const transformedHistory = history.map(entry => ({
+    id: entry.id.toString(),
+    operationType: entry.operationType,
+    timestamp: entry.timestamp.toISOString(),
+    user: entry.user ? `${entry.user.firstName} ${entry.user.lastName}` : 'Système',
+    dataType: entry.dataType,
+    fileFormat: entry.fileFormat,
+    fileName: entry.fileName,
+    fileSize: formatFileSize(entry.fileSize),
+    recordCount: entry.recordCount,
+    status: entry.status,
+    errorDetails: entry.errorDetails,
+    duration: entry.duration,
+    filePath: entry.filePath,
+    expiresAt: entry.expiresAt ? entry.expiresAt.toISOString() : null
+  }));
+
+  res.json(transformedHistory);
+}));
+
+// Routes pour la catégorie "Conformité"
+router.get('/complianceconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration de conformité (il ne devrait y avoir qu'une seule entrée)
+  let config = await ComplianceConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ComplianceConfig.create({
+      gdprEnabled: true,
+      dataRetentionPeriod: 730, // 2 ans
+      anonymizeAfterRetention: true,
+      requireConsent: true,
+      logSensitiveDataAccess: true,
+      encryptSensitiveData: true,
+      dataBreachNotification: true,
+      hipaaCompliance: false,
+      pciDssCompliance: false,
+      soxCompliance: false
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    gdprEnabled: config.gdprEnabled,
+    dataRetentionPeriod: config.dataRetentionPeriod,
+    anonymizeAfterRetention: config.anonymizeAfterRetention,
+    requireConsent: config.requireConsent,
+    consentText: config.consentText,
+    privacyPolicyUrl: config.privacyPolicyUrl,
+    logSensitiveDataAccess: config.logSensitiveDataAccess,
+    encryptSensitiveData: config.encryptSensitiveData,
+    dataBreachNotification: config.dataBreachNotification,
+    dataBreachEmails: config.dataBreachEmails,
+    hipaaCompliance: config.hipaaCompliance,
+    pciDssCompliance: config.pciDssCompliance,
+    soxCompliance: config.soxCompliance,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/complianceconfig', asyncHandler(async (req, res) => {
+  const {
+    gdprEnabled,
+    dataRetentionPeriod,
+    anonymizeAfterRetention,
+    requireConsent,
+    consentText,
+    privacyPolicyUrl,
+    logSensitiveDataAccess,
+    encryptSensitiveData,
+    dataBreachNotification,
+    dataBreachEmails,
+    hipaaCompliance,
+    pciDssCompliance,
+    soxCompliance,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration de conformité (il ne devrait y avoir qu'une seule entrée)
+  let config = await ComplianceConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await ComplianceConfig.create({
+      gdprEnabled: gdprEnabled !== undefined ? gdprEnabled : true,
+      dataRetentionPeriod: dataRetentionPeriod || 730,
+      anonymizeAfterRetention: anonymizeAfterRetention !== undefined ? anonymizeAfterRetention : true,
+      requireConsent: requireConsent !== undefined ? requireConsent : true,
+      consentText: consentText || null,
+      privacyPolicyUrl: privacyPolicyUrl || null,
+      logSensitiveDataAccess: logSensitiveDataAccess !== undefined ? logSensitiveDataAccess : true,
+      encryptSensitiveData: encryptSensitiveData !== undefined ? encryptSensitiveData : true,
+      dataBreachNotification: dataBreachNotification !== undefined ? dataBreachNotification : true,
+      dataBreachEmails: dataBreachEmails || null,
+      hipaaCompliance: hipaaCompliance !== undefined ? hipaaCompliance : false,
+      pciDssCompliance: pciDssCompliance !== undefined ? pciDssCompliance : false,
+      soxCompliance: soxCompliance !== undefined ? soxCompliance : false,
+      advancedSettings: advancedSettings || null
+    });
+  } else {
+    // Mettre à jour les champs
+    if (gdprEnabled !== undefined) config.gdprEnabled = gdprEnabled;
+    if (dataRetentionPeriod !== undefined) config.dataRetentionPeriod = dataRetentionPeriod;
+    if (anonymizeAfterRetention !== undefined) config.anonymizeAfterRetention = anonymizeAfterRetention;
+    if (requireConsent !== undefined) config.requireConsent = requireConsent;
+    if (consentText !== undefined) config.consentText = consentText;
+    if (privacyPolicyUrl !== undefined) config.privacyPolicyUrl = privacyPolicyUrl;
+    if (logSensitiveDataAccess !== undefined) config.logSensitiveDataAccess = logSensitiveDataAccess;
+    if (encryptSensitiveData !== undefined) config.encryptSensitiveData = encryptSensitiveData;
+    if (dataBreachNotification !== undefined) config.dataBreachNotification = dataBreachNotification;
+    if (dataBreachEmails !== undefined) config.dataBreachEmails = dataBreachEmails;
+    if (hipaaCompliance !== undefined) config.hipaaCompliance = hipaaCompliance;
+    if (pciDssCompliance !== undefined) config.pciDssCompliance = pciDssCompliance;
+    if (soxCompliance !== undefined) config.soxCompliance = soxCompliance;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    gdprEnabled: config.gdprEnabled,
+    dataRetentionPeriod: config.dataRetentionPeriod,
+    anonymizeAfterRetention: config.anonymizeAfterRetention,
+    requireConsent: config.requireConsent,
+    consentText: config.consentText,
+    privacyPolicyUrl: config.privacyPolicyUrl,
+    logSensitiveDataAccess: config.logSensitiveDataAccess,
+    encryptSensitiveData: config.encryptSensitiveData,
+    dataBreachNotification: config.dataBreachNotification,
+    dataBreachEmails: config.dataBreachEmails,
+    hipaaCompliance: config.hipaaCompliance,
+    pciDssCompliance: config.pciDssCompliance,
+    soxCompliance: config.soxCompliance,
+    advancedSettings: config.advancedSettings
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/consentrecords', asyncHandler(async (req, res) => {
+  const { userId, consentType } = req.query;
+
+  const whereClause = {};
+
+  if (userId) whereClause.userId = userId;
+  if (consentType) whereClause.consentType = consentType;
+
+  const records = await ConsentRecord.findAll({
+    where: whereClause,
+    include: [{ model: User, as: 'user' }],
+    order: [['consentDate', 'DESC']]
+  });
+
+  // Transformer les données
+  const transformedRecords = records.map(record => ({
+    id: record.id.toString(),
+    userId: record.userId.toString(),
+    user: record.user ? `${record.user.firstName} ${record.user.lastName}` : 'Inconnu',
+    consentType: record.consentType,
+    consentDate: record.consentDate.toISOString(),
+    consentValue: record.consentValue,
+    policyVersion: record.policyVersion,
+    ipAddress: record.ipAddress,
+    collectionMethod: record.collectionMethod,
+    expiryDate: record.expiryDate ? record.expiryDate.toISOString() : null
+  }));
+
+  res.json(transformedRecords);
+}));
+
+router.post('/consentrecords', asyncHandler(async (req, res) => {
+  const {
+    userId,
+    consentType,
+    consentValue,
+    policyVersion,
+    ipAddress,
+    userAgent,
+    collectionMethod,
+    consentText,
+    expiryDate,
+    metadata
+  } = req.body;
+
+  // Vérifier que l'utilisateur existe
+  const user = await User.findByPk(userId);
+  if (!user) {
+    return res.status(404).json({ message: 'Utilisateur non trouvé' });
+  }
+
+  // Créer l'enregistrement de consentement
+  const record = await ConsentRecord.create({
+    userId,
+    consentType,
+    consentValue,
+    policyVersion,
+    ipAddress,
+    userAgent,
+    collectionMethod,
+    consentText,
+    expiryDate: expiryDate ? new Date(expiryDate) : null,
+    metadata
+  });
+
+  // Transformer les données
+  const transformedRecord = {
+    id: record.id.toString(),
+    userId: record.userId.toString(),
+    consentType: record.consentType,
+    consentDate: record.consentDate.toISOString(),
+    consentValue: record.consentValue,
+    policyVersion: record.policyVersion,
+    ipAddress: record.ipAddress,
+    collectionMethod: record.collectionMethod,
+    expiryDate: record.expiryDate ? record.expiryDate.toISOString() : null
+  };
+
+  res.status(201).json(transformedRecord);
 }));
 
 module.exports = router;

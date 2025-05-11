@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
 import { Badge } from '../../components/ui/badge';
-import { Truck, Plus, Trash2, Package } from 'lucide-react';
+import { Truck, Plus, Trash2, Package, Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { useToast } from '../../components/ui/use-toast';
+import { api } from '../../services/api';
 
 interface ShippingMethod {
   id: string;
@@ -14,35 +18,40 @@ interface ShippingMethod {
   deliveryTime: string;
   price: string;
   isActive: boolean;
+  displayOrder?: number;
+  lastModified?: string;
 }
 
 const ShippingMethodsSettings: React.FC = () => {
-  const [methods, setMethods] = useState<ShippingMethod[]>([
-    {
-      id: '1',
-      name: 'Standard',
-      carrier: 'La Poste',
-      deliveryTime: '2-5 jours',
-      price: '5.99€',
-      isActive: true
-    },
-    {
-      id: '2',
-      name: 'Express',
-      carrier: 'UPS',
-      deliveryTime: '24h',
-      price: '12.99€',
-      isActive: true
-    },
-    {
-      id: '3',
-      name: 'Point Relais',
-      carrier: 'Mondial Relay',
-      deliveryTime: '3-7 jours',
-      price: '4.99€',
-      isActive: false
-    }
-  ]);
+  const { toast } = useToast();
+  const [methods, setMethods] = useState<ShippingMethod[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [methodToDelete, setMethodToDelete] = useState<ShippingMethod | null>(null);
+  const [deletingMethod, setDeletingMethod] = useState<string | null>(null);
+  const [togglingMethod, setTogglingMethod] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Charger les méthodes d'expédition depuis l'API
+  useEffect(() => {
+    const fetchMethods = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.get('/shippingmethods');
+        setMethods(response.data);
+      } catch (err) {
+        console.error('Erreur lors du chargement des méthodes d\'expédition:', err);
+        setError('Impossible de charger les méthodes d\'expédition. Veuillez réessayer plus tard.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMethods();
+  }, []);
 
   const [newMethod, setNewMethod] = useState({
     name: '',
@@ -51,35 +60,116 @@ const ShippingMethodsSettings: React.FC = () => {
     price: ''
   });
 
-  const handleAddMethod = () => {
+  // Ouvrir la boîte de dialogue de confirmation de suppression
+  const openDeleteDialog = (method: ShippingMethod) => {
+    setMethodToDelete(method);
+    setShowDeleteDialog(true);
+  };
+
+  // Ajouter une nouvelle méthode d'expédition
+  const handleAddMethod = async () => {
     if (!newMethod.name || !newMethod.carrier || !newMethod.deliveryTime || !newMethod.price) return;
-    
-    const method: ShippingMethod = {
-      id: String(methods.length + 1),
-      name: newMethod.name,
-      carrier: newMethod.carrier,
-      deliveryTime: newMethod.deliveryTime,
-      price: newMethod.price,
-      isActive: true
-    };
 
-    setMethods([...methods, method]);
-    setNewMethod({
-      name: '',
-      carrier: '',
-      deliveryTime: '',
-      price: ''
-    });
+    setSubmitting(true);
+
+    try {
+      const response = await api.post('/shippingmethods', {
+        name: newMethod.name,
+        carrier: newMethod.carrier,
+        deliveryTime: newMethod.deliveryTime,
+        price: newMethod.price,
+        isActive: true,
+        displayOrder: methods.length + 1
+      });
+
+      // Mettre à jour l'état local
+      setMethods([...methods, response.data]);
+
+      // Réinitialiser le formulaire
+      setNewMethod({
+        name: '',
+        carrier: '',
+        deliveryTime: '',
+        price: ''
+      });
+
+      toast({
+        title: "Méthode ajoutée",
+        description: "La méthode d'expédition a été ajoutée avec succès.",
+        variant: "default",
+      });
+    } catch (err) {
+      console.error('Erreur lors de l\'ajout de la méthode d\'expédition:', err);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter la méthode d'expédition.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleToggleMethod = (id: string) => {
-    setMethods(methods.map(method => 
-      method.id === id ? { ...method, isActive: !method.isActive } : method
-    ));
+  // Activer/désactiver une méthode d'expédition
+  const handleToggleMethod = async (id: string) => {
+    setTogglingMethod(id);
+
+    try {
+      const response = await api.patch(`/shippingmethods/${id}/toggle`);
+
+      // Mettre à jour l'état local
+      setMethods(methods.map(method =>
+        method.id === id ? { ...method, isActive: response.data.isActive } : method
+      ));
+
+      toast({
+        title: response.data.isActive ? "Méthode activée" : "Méthode désactivée",
+        description: `La méthode "${response.data.name}" a été ${response.data.isActive ? 'activée' : 'désactivée'}.`,
+        variant: "default",
+      });
+    } catch (err) {
+      console.error('Erreur lors de la modification du statut de la méthode:', err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le statut de la méthode d'expédition.",
+        variant: "destructive",
+      });
+    } finally {
+      setTogglingMethod(null);
+    }
   };
 
-  const handleDeleteMethod = (id: string) => {
-    setMethods(methods.filter(method => method.id !== id));
+  // Supprimer une méthode d'expédition
+  const handleDeleteMethod = async () => {
+    if (!methodToDelete) return;
+
+    setDeletingMethod(methodToDelete.id);
+
+    try {
+      await api.delete(`/shippingmethods/${methodToDelete.id}`);
+
+      // Mettre à jour l'état local
+      setMethods(methods.filter(method => method.id !== methodToDelete.id));
+
+      // Fermer la boîte de dialogue
+      setShowDeleteDialog(false);
+      setMethodToDelete(null);
+
+      toast({
+        title: "Méthode supprimée",
+        description: "La méthode d'expédition a été supprimée avec succès.",
+        variant: "default",
+      });
+    } catch (err) {
+      console.error('Erreur lors de la suppression de la méthode:', err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la méthode d'expédition.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingMethod(null);
+    }
   };
 
   return (
@@ -92,6 +182,15 @@ const ShippingMethodsSettings: React.FC = () => {
           <p className="text-muted-foreground mt-1">Configurez les options de livraison disponibles</p>
         </div>
       </div>
+
+      {/* Message d'erreur */}
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erreur</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Formulaire d'ajout */}
       <Card className="mb-6">
@@ -154,13 +253,22 @@ const ShippingMethodsSettings: React.FC = () => {
             </div>
 
             <div className="flex justify-end">
-              <Button 
+              <Button
                 className="bg-ivory-orange hover:bg-ivory-orange/90"
                 onClick={handleAddMethod}
-                disabled={!newMethod.name || !newMethod.carrier || !newMethod.deliveryTime || !newMethod.price}
+                disabled={submitting || !newMethod.name || !newMethod.carrier || !newMethod.deliveryTime || !newMethod.price}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter la méthode
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Ajout en cours...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter la méthode
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -174,41 +282,114 @@ const ShippingMethodsSettings: React.FC = () => {
           <CardDescription>Liste des options d'expédition configurées</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {methods.map((method) => (
-              <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <Package className="h-6 w-6 text-muted-foreground" />
-                  <div>
-                    <div className="font-medium">{method.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {method.carrier} • {method.deliveryTime} • {method.price}
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-ivory-orange" />
+              <span className="ml-2">Chargement des méthodes d'expédition...</span>
+            </div>
+          ) : methods.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="mb-2">Aucune méthode d'expédition configurée</div>
+              <div className="text-sm">Ajoutez une méthode pour commencer</div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {methods.map((method) => (
+                <div key={method.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">{method.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {method.carrier} • {method.deliveryTime} • {method.price}
+                      </div>
+                      {method.lastModified && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Dernière modification: {method.lastModified}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={method.isActive}
-                      onCheckedChange={() => handleToggleMethod(method.id)}
-                    />
-                    <Badge variant={method.isActive ? 'default' : 'outline'}>
-                      {method.isActive ? 'Actif' : 'Inactif'}
-                    </Badge>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={method.isActive}
+                        onCheckedChange={() => handleToggleMethod(method.id)}
+                        disabled={togglingMethod === method.id}
+                      />
+                      <Badge variant={method.isActive ? 'default' : 'outline'}>
+                        {togglingMethod === method.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          method.isActive ? 'Actif' : 'Inactif'
+                        )}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openDeleteDialog(method)}
+                      disabled={deletingMethod === method.id}
+                      title="Supprimer"
+                    >
+                      {deletingMethod === method.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleDeleteMethod(method.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Boîte de dialogue de confirmation de suppression */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer la méthode d'expédition</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette méthode d'expédition ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          {methodToDelete && (
+            <div className="py-4">
+              <p className="font-medium">{methodToDelete.name}</p>
+              <p className="text-sm text-muted-foreground">Transporteur: {methodToDelete.carrier}</p>
+              <p className="text-sm text-muted-foreground">Délai: {methodToDelete.deliveryTime}</p>
+              <p className="text-sm text-muted-foreground">Prix: {methodToDelete.price}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteMethod}
+              disabled={deletingMethod !== null}
+            >
+              {deletingMethod !== null ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Suppression...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
