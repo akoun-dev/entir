@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, PaymentProvider, ShippingMethod, ExternalService, AuditLog, AuditConfig, Backup, BackupConfig, ThemeConfig, CustomLogo, ImportConfig, ExportConfig, ImportExportHistory, ComplianceConfig, ConsentRecord, Sequelize } = require('../models');
+const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, PaymentProvider, ShippingMethod, ExternalService, AuditLog, AuditConfig, Backup, BackupConfig, ThemeConfig, CustomLogo, ImportConfig, ExportConfig, ImportExportHistory, ComplianceConfig, ConsentRecord, CalendarConfig, Holiday, CalendarIntegration, Sequence, SequenceConfig, PerformanceConfig, Sequelize } = require('../models');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { Op } = Sequelize;
@@ -5439,6 +5439,675 @@ router.post('/consentrecords', asyncHandler(async (req, res) => {
   };
 
   res.status(201).json(transformedRecord);
+}));
+
+// Routes pour la catégorie "Calendrier"
+router.get('/calendarconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration du calendrier (il ne devrait y avoir qu'une seule entrée)
+  let config = await CalendarConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await CalendarConfig.create({
+      timezone: 'Europe/Paris',
+      workHoursStart: '08:00',
+      workHoursEnd: '18:00',
+      weekStart: 'monday',
+      dateFormat: 'YYYY-MM-DD',
+      timeFormat: 'HH:mm',
+      workDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      advancedSettings: {
+        showWeekNumbers: true,
+        firstDayOfYear: 1,
+        minimalDaysInFirstWeek: 4,
+        workWeekStart: 1,
+        workWeekEnd: 5,
+        defaultView: 'month',
+        defaultDuration: 60,
+        slotDuration: 30,
+        snapDuration: 15
+      }
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    timezone: config.timezone,
+    workHoursStart: config.workHoursStart,
+    workHoursEnd: config.workHoursEnd,
+    weekStart: config.weekStart,
+    dateFormat: config.dateFormat,
+    timeFormat: config.timeFormat,
+    workDays: config.workDays,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/calendarconfig', asyncHandler(async (req, res) => {
+  const {
+    timezone,
+    workHoursStart,
+    workHoursEnd,
+    weekStart,
+    dateFormat,
+    timeFormat,
+    workDays,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration du calendrier (il ne devrait y avoir qu'une seule entrée)
+  let config = await CalendarConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await CalendarConfig.create({
+      timezone: timezone || 'Europe/Paris',
+      workHoursStart: workHoursStart || '08:00',
+      workHoursEnd: workHoursEnd || '18:00',
+      weekStart: weekStart || 'monday',
+      dateFormat: dateFormat || 'YYYY-MM-DD',
+      timeFormat: timeFormat || 'HH:mm',
+      workDays: workDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      advancedSettings: advancedSettings || {}
+    });
+  } else {
+    // Mettre à jour les champs
+    if (timezone !== undefined) config.timezone = timezone;
+    if (workHoursStart !== undefined) config.workHoursStart = workHoursStart;
+    if (workHoursEnd !== undefined) config.workHoursEnd = workHoursEnd;
+    if (weekStart !== undefined) config.weekStart = weekStart;
+    if (dateFormat !== undefined) config.dateFormat = dateFormat;
+    if (timeFormat !== undefined) config.timeFormat = timeFormat;
+    if (workDays !== undefined) config.workDays = workDays;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    timezone: config.timezone,
+    workHoursStart: config.workHoursStart,
+    workHoursEnd: config.workHoursEnd,
+    weekStart: config.weekStart,
+    dateFormat: config.dateFormat,
+    timeFormat: config.timeFormat,
+    workDays: config.workDays,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/holidays', asyncHandler(async (req, res) => {
+  const holidays = await Holiday.findAll({
+    order: [['date', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedHolidays = holidays.map(holiday => ({
+    id: holiday.id.toString(),
+    name: holiday.name,
+    date: holiday.date,
+    country: holiday.country,
+    recurring: holiday.recurring,
+    type: holiday.type,
+    description: holiday.description || '',
+    active: holiday.active
+  }));
+
+  res.json(transformedHolidays);
+}));
+
+router.post('/holidays', asyncHandler(async (req, res) => {
+  const {
+    name,
+    date,
+    country,
+    recurring,
+    type,
+    description,
+    active
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !date) {
+    return res.status(400).json({ message: 'Les champs name et date sont requis' });
+  }
+
+  // Créer le jour férié
+  const holiday = await Holiday.create({
+    name,
+    date,
+    country: country || 'France',
+    recurring: recurring !== undefined ? recurring : true,
+    type: type || 'national',
+    description,
+    active: active !== undefined ? active : true
+  });
+
+  // Transformer les données
+  const transformedHoliday = {
+    id: holiday.id.toString(),
+    name: holiday.name,
+    date: holiday.date,
+    country: holiday.country,
+    recurring: holiday.recurring,
+    type: holiday.type,
+    description: holiday.description || '',
+    active: holiday.active
+  };
+
+  res.status(201).json(transformedHoliday);
+}));
+
+router.put('/holidays/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    date,
+    country,
+    recurring,
+    type,
+    description,
+    active
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !date) {
+    return res.status(400).json({ message: 'Les champs name et date sont requis' });
+  }
+
+  const holiday = await Holiday.findByPk(req.params.id);
+  if (!holiday) {
+    return res.status(404).json({ message: 'Jour férié non trouvé' });
+  }
+
+  // Mettre à jour le jour férié
+  await holiday.update({
+    name,
+    date,
+    country: country || holiday.country,
+    recurring: recurring !== undefined ? recurring : holiday.recurring,
+    type: type || holiday.type,
+    description: description !== undefined ? description : holiday.description,
+    active: active !== undefined ? active : holiday.active
+  });
+
+  // Transformer les données
+  const transformedHoliday = {
+    id: holiday.id.toString(),
+    name: holiday.name,
+    date: holiday.date,
+    country: holiday.country,
+    recurring: holiday.recurring,
+    type: holiday.type,
+    description: holiday.description || '',
+    active: holiday.active
+  };
+
+  res.json(transformedHoliday);
+}));
+
+router.delete('/holidays/:id', asyncHandler(async (req, res) => {
+  const holiday = await Holiday.findByPk(req.params.id);
+  if (!holiday) {
+    return res.status(404).json({ message: 'Jour férié non trouvé' });
+  }
+
+  await holiday.destroy();
+  res.status(204).end();
+}));
+
+router.get('/calendarintegrations', asyncHandler(async (req, res) => {
+  const integrations = await CalendarIntegration.findAll({
+    include: [{ model: User, as: 'user' }],
+    order: [['type', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedIntegrations = integrations.map(integration => ({
+    id: integration.id.toString(),
+    type: integration.type,
+    name: integration.name,
+    userId: integration.userId ? integration.userId.toString() : null,
+    userName: integration.user ? `${integration.user.firstName} ${integration.user.lastName}` : null,
+    lastSync: integration.lastSync ? integration.lastSync.toISOString() : null,
+    lastSyncStatus: integration.lastSyncStatus,
+    active: integration.active
+  }));
+
+  res.json(transformedIntegrations);
+}));
+
+// Routes pour la catégorie "Numérotation"
+router.get('/sequenceconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration des séquences (il ne devrait y avoir qu'une seule entrée)
+  let config = await SequenceConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await SequenceConfig.create({
+      fiscalYearStart: '01-01',
+      fiscalYearEnd: '12-31',
+      defaultFormat: 'prefix-number-year',
+      defaultPadding: 5,
+      autoReset: true,
+      advancedSettings: {
+        yearFormat: 'YY',
+        separator: '-',
+        allowCustomFormat: true,
+        allowManualReset: true,
+        allowManualNumbering: false,
+        enforceUniqueness: true,
+        lockSequenceAfterUse: true
+      }
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    fiscalYearStart: config.fiscalYearStart,
+    fiscalYearEnd: config.fiscalYearEnd,
+    defaultFormat: config.defaultFormat,
+    defaultPadding: config.defaultPadding,
+    autoReset: config.autoReset,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/sequenceconfig', asyncHandler(async (req, res) => {
+  const {
+    fiscalYearStart,
+    fiscalYearEnd,
+    defaultFormat,
+    defaultPadding,
+    autoReset,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration des séquences (il ne devrait y avoir qu'une seule entrée)
+  let config = await SequenceConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await SequenceConfig.create({
+      fiscalYearStart: fiscalYearStart || '01-01',
+      fiscalYearEnd: fiscalYearEnd || '12-31',
+      defaultFormat: defaultFormat || 'prefix-number-year',
+      defaultPadding: defaultPadding || 5,
+      autoReset: autoReset !== undefined ? autoReset : true,
+      advancedSettings: advancedSettings || {}
+    });
+  } else {
+    // Mettre à jour les champs
+    if (fiscalYearStart !== undefined) config.fiscalYearStart = fiscalYearStart;
+    if (fiscalYearEnd !== undefined) config.fiscalYearEnd = fiscalYearEnd;
+    if (defaultFormat !== undefined) config.defaultFormat = defaultFormat;
+    if (defaultPadding !== undefined) config.defaultPadding = defaultPadding;
+    if (autoReset !== undefined) config.autoReset = autoReset;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    fiscalYearStart: config.fiscalYearStart,
+    fiscalYearEnd: config.fiscalYearEnd,
+    defaultFormat: config.defaultFormat,
+    defaultPadding: config.defaultPadding,
+    autoReset: config.autoReset,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/sequences', asyncHandler(async (req, res) => {
+  const sequences = await Sequence.findAll({
+    order: [['documentType', 'ASC'], ['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedSequences = sequences.map(sequence => ({
+    id: sequence.id.toString(),
+    name: sequence.name,
+    prefix: sequence.prefix || '',
+    suffix: sequence.suffix || '',
+    nextNumber: sequence.nextNumber,
+    padding: sequence.padding,
+    resetFrequency: sequence.resetFrequency,
+    documentType: sequence.documentType,
+    lastReset: sequence.lastReset ? sequence.lastReset.toISOString() : null,
+    active: sequence.active
+  }));
+
+  res.json(transformedSequences);
+}));
+
+router.post('/sequences', asyncHandler(async (req, res) => {
+  const {
+    name,
+    prefix,
+    suffix,
+    nextNumber,
+    padding,
+    resetFrequency,
+    documentType,
+    active
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !documentType) {
+    return res.status(400).json({ message: 'Les champs name et documentType sont requis' });
+  }
+
+  // Vérifier si une séquence existe déjà pour ce type de document
+  const existingSequence = await Sequence.findOne({
+    where: { documentType }
+  });
+
+  if (existingSequence) {
+    return res.status(400).json({ message: `Une séquence existe déjà pour le type de document ${documentType}` });
+  }
+
+  // Créer la séquence
+  const sequence = await Sequence.create({
+    name,
+    prefix: prefix || '',
+    suffix: suffix || '',
+    nextNumber: nextNumber || 1,
+    padding: padding || 5,
+    resetFrequency: resetFrequency || 'never',
+    documentType,
+    lastReset: resetFrequency !== 'never' ? new Date() : null,
+    active: active !== undefined ? active : true
+  });
+
+  // Transformer les données
+  const transformedSequence = {
+    id: sequence.id.toString(),
+    name: sequence.name,
+    prefix: sequence.prefix || '',
+    suffix: sequence.suffix || '',
+    nextNumber: sequence.nextNumber,
+    padding: sequence.padding,
+    resetFrequency: sequence.resetFrequency,
+    documentType: sequence.documentType,
+    lastReset: sequence.lastReset ? sequence.lastReset.toISOString() : null,
+    active: sequence.active
+  };
+
+  res.status(201).json(transformedSequence);
+}));
+
+router.put('/sequences/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    prefix,
+    suffix,
+    nextNumber,
+    padding,
+    resetFrequency,
+    documentType,
+    active
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !documentType) {
+    return res.status(400).json({ message: 'Les champs name et documentType sont requis' });
+  }
+
+  const sequence = await Sequence.findByPk(req.params.id);
+  if (!sequence) {
+    return res.status(404).json({ message: 'Séquence non trouvée' });
+  }
+
+  // Si le type de document a changé, vérifier qu'il n'existe pas déjà une séquence pour ce type
+  if (documentType !== sequence.documentType) {
+    const existingSequence = await Sequence.findOne({
+      where: { documentType }
+    });
+
+    if (existingSequence && existingSequence.id !== parseInt(req.params.id)) {
+      return res.status(400).json({ message: `Une séquence existe déjà pour le type de document ${documentType}` });
+    }
+  }
+
+  // Mettre à jour la séquence
+  await sequence.update({
+    name,
+    prefix: prefix !== undefined ? prefix : sequence.prefix,
+    suffix: suffix !== undefined ? suffix : sequence.suffix,
+    nextNumber: nextNumber || sequence.nextNumber,
+    padding: padding || sequence.padding,
+    resetFrequency: resetFrequency || sequence.resetFrequency,
+    documentType,
+    active: active !== undefined ? active : sequence.active
+  });
+
+  // Transformer les données
+  const transformedSequence = {
+    id: sequence.id.toString(),
+    name: sequence.name,
+    prefix: sequence.prefix || '',
+    suffix: sequence.suffix || '',
+    nextNumber: sequence.nextNumber,
+    padding: sequence.padding,
+    resetFrequency: sequence.resetFrequency,
+    documentType: sequence.documentType,
+    lastReset: sequence.lastReset ? sequence.lastReset.toISOString() : null,
+    active: sequence.active
+  };
+
+  res.json(transformedSequence);
+}));
+
+router.delete('/sequences/:id', asyncHandler(async (req, res) => {
+  const sequence = await Sequence.findByPk(req.params.id);
+  if (!sequence) {
+    return res.status(404).json({ message: 'Séquence non trouvée' });
+  }
+
+  await sequence.destroy();
+  res.status(204).end();
+}));
+
+router.post('/sequences/:id/reset', asyncHandler(async (req, res) => {
+  const sequence = await Sequence.findByPk(req.params.id);
+  if (!sequence) {
+    return res.status(404).json({ message: 'Séquence non trouvée' });
+  }
+
+  // Réinitialiser la séquence
+  await sequence.update({
+    nextNumber: 1,
+    lastReset: new Date()
+  });
+
+  // Transformer les données
+  const transformedSequence = {
+    id: sequence.id.toString(),
+    name: sequence.name,
+    prefix: sequence.prefix || '',
+    suffix: sequence.suffix || '',
+    nextNumber: sequence.nextNumber,
+    padding: sequence.padding,
+    resetFrequency: sequence.resetFrequency,
+    documentType: sequence.documentType,
+    lastReset: sequence.lastReset ? sequence.lastReset.toISOString() : null,
+    active: sequence.active
+  };
+
+  res.json(transformedSequence);
+}));
+
+// Routes pour la catégorie "Performance"
+router.get('/performanceconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration des performances (il ne devrait y avoir qu'une seule entrée)
+  let config = await PerformanceConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await PerformanceConfig.create({
+      cacheEnabled: true,
+      cacheSize: 500,
+      cacheTTL: 3600,
+      defaultPageSize: 25,
+      queryOptimization: true,
+      responseCompression: true,
+      loggingLevel: 'info',
+      requestTimeout: 30,
+      maxDbConnections: 10,
+      advancedSettings: {
+        minifyAssets: true,
+        useEtags: true,
+        gzipCompression: true,
+        staticCacheMaxAge: 86400,
+        apiRateLimit: 100,
+        apiRateLimitWindow: 60,
+        dbPoolIdleTimeout: 10000,
+        dbPoolAcquireTimeout: 60000,
+        dbPoolMaxUsage: 10,
+        dbSlowQueryThreshold: 1000,
+        memoryWatchEnabled: true,
+        memoryWatchThreshold: 80,
+        cpuWatchEnabled: true,
+        cpuWatchThreshold: 70
+      }
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    cacheEnabled: config.cacheEnabled,
+    cacheSize: config.cacheSize,
+    cacheTTL: config.cacheTTL,
+    defaultPageSize: config.defaultPageSize,
+    queryOptimization: config.queryOptimization,
+    responseCompression: config.responseCompression,
+    loggingLevel: config.loggingLevel,
+    requestTimeout: config.requestTimeout,
+    maxDbConnections: config.maxDbConnections,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/performanceconfig', asyncHandler(async (req, res) => {
+  const {
+    cacheEnabled,
+    cacheSize,
+    cacheTTL,
+    defaultPageSize,
+    queryOptimization,
+    responseCompression,
+    loggingLevel,
+    requestTimeout,
+    maxDbConnections,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration des performances (il ne devrait y avoir qu'une seule entrée)
+  let config = await PerformanceConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await PerformanceConfig.create({
+      cacheEnabled: cacheEnabled !== undefined ? cacheEnabled : true,
+      cacheSize: cacheSize || 500,
+      cacheTTL: cacheTTL || 3600,
+      defaultPageSize: defaultPageSize || 25,
+      queryOptimization: queryOptimization !== undefined ? queryOptimization : true,
+      responseCompression: responseCompression !== undefined ? responseCompression : true,
+      loggingLevel: loggingLevel || 'info',
+      requestTimeout: requestTimeout || 30,
+      maxDbConnections: maxDbConnections || 10,
+      advancedSettings: advancedSettings || {}
+    });
+  } else {
+    // Mettre à jour les champs
+    if (cacheEnabled !== undefined) config.cacheEnabled = cacheEnabled;
+    if (cacheSize !== undefined) config.cacheSize = cacheSize;
+    if (cacheTTL !== undefined) config.cacheTTL = cacheTTL;
+    if (defaultPageSize !== undefined) config.defaultPageSize = defaultPageSize;
+    if (queryOptimization !== undefined) config.queryOptimization = queryOptimization;
+    if (responseCompression !== undefined) config.responseCompression = responseCompression;
+    if (loggingLevel !== undefined) config.loggingLevel = loggingLevel;
+    if (requestTimeout !== undefined) config.requestTimeout = requestTimeout;
+    if (maxDbConnections !== undefined) config.maxDbConnections = maxDbConnections;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    cacheEnabled: config.cacheEnabled,
+    cacheSize: config.cacheSize,
+    cacheTTL: config.cacheTTL,
+    defaultPageSize: config.defaultPageSize,
+    queryOptimization: config.queryOptimization,
+    responseCompression: config.responseCompression,
+    loggingLevel: config.loggingLevel,
+    requestTimeout: config.requestTimeout,
+    maxDbConnections: config.maxDbConnections,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.get('/performancemetrics', asyncHandler(async (req, res) => {
+  // Simuler des métriques de performance (dans une vraie application, ces données proviendraient de moniteurs système)
+  const metrics = {
+    cpu: {
+      usage: Math.floor(Math.random() * 100),
+      cores: 4,
+      load: [Math.random() * 2, Math.random() * 1.5, Math.random() * 1]
+    },
+    memory: {
+      total: 8192, // MB
+      used: Math.floor(Math.random() * 4096) + 2048, // MB
+      free: Math.floor(Math.random() * 2048), // MB
+      usage: Math.floor(Math.random() * 100)
+    },
+    disk: {
+      total: 100, // GB
+      used: Math.floor(Math.random() * 50) + 30, // GB
+      free: Math.floor(Math.random() * 20), // GB
+      usage: Math.floor(Math.random() * 100)
+    },
+    network: {
+      inbound: Math.floor(Math.random() * 1000), // KB/s
+      outbound: Math.floor(Math.random() * 500), // KB/s
+      connections: Math.floor(Math.random() * 100)
+    },
+    database: {
+      connections: Math.floor(Math.random() * 20),
+      queryTime: Math.floor(Math.random() * 200), // ms
+      slowQueries: Math.floor(Math.random() * 5)
+    },
+    api: {
+      requests: Math.floor(Math.random() * 1000),
+      responseTime: Math.floor(Math.random() * 300), // ms
+      errors: Math.floor(Math.random() * 10)
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  res.json(metrics);
 }));
 
 module.exports = router;

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { Label } from '../../components/ui/label';
-import { Hash, FileText, Calendar, Plus } from 'lucide-react';
+import { Hash, FileText, Calendar, Plus, Loader2 } from 'lucide-react';
+import axios from 'axios';
 
 interface Sequence {
   id: string;
@@ -14,45 +15,104 @@ interface Sequence {
   nextNumber: number;
   padding: number;
   resetFrequency: 'never' | 'yearly' | 'monthly';
+  documentType: string;
+  lastReset: string | null;
+  active: boolean;
+}
+
+interface SequenceConfig {
+  id: string;
+  fiscalYearStart: string;
+  fiscalYearEnd: string;
+  defaultFormat: string;
+  defaultPadding: number;
+  autoReset: boolean;
+  advancedSettings: {
+    yearFormat: string;
+    separator: string;
+    allowCustomFormat: boolean;
+    allowManualReset: boolean;
+    allowManualNumbering: boolean;
+    enforceUniqueness: boolean;
+    lockSequenceAfterUse: boolean;
+  };
 }
 
 const SequenceSettings: React.FC = () => {
-  const [sequences, setSequences] = useState<Sequence[]>([
-    {
-      id: '1',
-      name: 'Factures clients',
-      prefix: 'FAC-',
-      suffix: '',
-      nextNumber: 1245,
-      padding: 5,
-      resetFrequency: 'yearly'
-    },
-    {
-      id: '2',
-      name: 'Devis',
-      prefix: 'DEV-',
-      suffix: '',
-      nextNumber: 378,
-      padding: 4,
-      resetFrequency: 'never'
-    },
-    {
-      id: '3',
-      name: 'Commandes',
-      prefix: 'CMD-',
-      suffix: '-2023',
-      nextNumber: 892,
-      padding: 6,
-      resetFrequency: 'yearly'
-    }
-  ]);
-
+  const [loading, setLoading] = useState(true);
+  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [sequenceConfig, setSequenceConfig] = useState<SequenceConfig | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredSequences = sequences.filter(sequence => 
-    sequence.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  // Charger les données depuis l'API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        // Récupérer les séquences
+        const sequencesResponse = await axios.get('http://localhost:3001/api/sequences');
+        setSequences(sequencesResponse.data);
+
+        // Récupérer la configuration des séquences
+        const configResponse = await axios.get('http://localhost:3001/api/sequenceconfig');
+        setSequenceConfig(configResponse.data);
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Erreur lors du chargement des données de séquence:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const filteredSequences = sequences.filter(sequence =>
+    sequence.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     sequence.prefix.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Fonction pour sauvegarder la configuration des séquences
+  const saveSequenceConfig = async () => {
+    try {
+      setLoading(true);
+
+      if (!sequenceConfig) return;
+
+      await axios.put('http://localhost:3001/api/sequenceconfig', sequenceConfig);
+
+      setLoading(false);
+      alert('Configuration des séquences enregistrée avec succès');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de la configuration:', error);
+      setLoading(false);
+      alert('Erreur lors de la sauvegarde de la configuration');
+    }
+  };
+
+  // Fonction pour réinitialiser une séquence
+  const resetSequence = async (id: string) => {
+    try {
+      if (confirm('Êtes-vous sûr de vouloir réinitialiser cette séquence ? Le prochain numéro sera 1.')) {
+        setLoading(true);
+
+        const response = await axios.post(`http://localhost:3001/api/sequences/${id}/reset`);
+
+        // Mettre à jour la séquence dans le tableau
+        setSequences(sequences.map(seq =>
+          seq.id === id ? response.data : seq
+        ));
+
+        setLoading(false);
+        alert('Séquence réinitialisée avec succès');
+      }
+    } catch (error) {
+      console.error('Erreur lors de la réinitialisation de la séquence:', error);
+      setLoading(false);
+      alert('Erreur lors de la réinitialisation de la séquence');
+    }
+  };
 
   return (
     <div className="p-6">
@@ -64,7 +124,13 @@ const SequenceSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="space-y-6">
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-ivory-orange" />
+          <span className="ml-2">Chargement des données...</span>
+        </div>
+      ) : (
+        <div className="space-y-6">
         {/* Liste des séquences */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -95,11 +161,11 @@ const SequenceSettings: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium">{sequence.name}</h3>
                         <Badge variant="outline">
-                          {sequence.resetFrequency === 'never' ? 'Jamais' : 
+                          {sequence.resetFrequency === 'never' ? 'Jamais' :
                            sequence.resetFrequency === 'yearly' ? 'Annuel' : 'Mensuel'}
                         </Badge>
                       </div>
-                      
+
                       <div className="mt-3 grid grid-cols-4 gap-4">
                         <div>
                           <Label>Préfixe</Label>
@@ -142,19 +208,76 @@ const SequenceSettings: React.FC = () => {
             <CardDescription>Paramètres généraux de numérotation</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-6">
-            <div>
-              <Label>Année fiscale</Label>
-              <div className="mt-2 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Du 01/01/2023 au 31/12/2023</span>
-              </div>
-            </div>
-            <div>
-              <Label>Format par défaut</Label>
-              <div className="mt-2">
-                <Badge variant="outline">Préfixe-Numéro-Année</Badge>
-              </div>
-            </div>
+            {sequenceConfig && (
+              <>
+                <div>
+                  <Label>Année fiscale</Label>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      Du {sequenceConfig.fiscalYearStart} au {sequenceConfig.fiscalYearEnd}
+                    </span>
+                  </div>
+                  <div className="mt-4">
+                    <Label htmlFor="fiscal-year-start">Début de l'année fiscale</Label>
+                    <Input
+                      id="fiscal-year-start"
+                      value={sequenceConfig.fiscalYearStart}
+                      onChange={(e) => setSequenceConfig({
+                        ...sequenceConfig,
+                        fiscalYearStart: e.target.value
+                      })}
+                      className="mt-2"
+                      placeholder="MM-DD"
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <Label htmlFor="fiscal-year-end">Fin de l'année fiscale</Label>
+                    <Input
+                      id="fiscal-year-end"
+                      value={sequenceConfig.fiscalYearEnd}
+                      onChange={(e) => setSequenceConfig({
+                        ...sequenceConfig,
+                        fiscalYearEnd: e.target.value
+                      })}
+                      className="mt-2"
+                      placeholder="MM-DD"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Format par défaut</Label>
+                  <div className="mt-2">
+                    <Badge variant="outline">{sequenceConfig.defaultFormat}</Badge>
+                  </div>
+                  <div className="mt-4">
+                    <Label htmlFor="default-format">Format par défaut</Label>
+                    <Input
+                      id="default-format"
+                      value={sequenceConfig.defaultFormat}
+                      onChange={(e) => setSequenceConfig({
+                        ...sequenceConfig,
+                        defaultFormat: e.target.value
+                      })}
+                      className="mt-2"
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <Label htmlFor="default-padding">Padding par défaut</Label>
+                    <Input
+                      id="default-padding"
+                      type="number"
+                      value={sequenceConfig.defaultPadding}
+                      onChange={(e) => setSequenceConfig({
+                        ...sequenceConfig,
+                        defaultPadding: parseInt(e.target.value)
+                      })}
+                      className="mt-2"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -165,20 +288,75 @@ const SequenceSettings: React.FC = () => {
             <CardDescription>Gestion des réinitialisations périodiques</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Réinitialisation annuelle</Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Les compteurs seront réinitialisés au début de chaque année fiscale
-                </p>
+            {sequenceConfig && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Réinitialisation automatique</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Les compteurs seront réinitialisés automatiquement selon leur fréquence
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="auto-reset">Activer</Label>
+                    <input
+                      type="checkbox"
+                      id="auto-reset"
+                      checked={sequenceConfig.autoReset}
+                      onChange={(e) => setSequenceConfig({
+                        ...sequenceConfig,
+                        autoReset: e.target.checked
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="font-medium mb-2">Réinitialisation manuelle</h3>
+                  <div className="space-y-2">
+                    {sequences.map(sequence => (
+                      <div key={sequence.id} className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium">{sequence.name}</span>
+                          <span className="text-sm text-muted-foreground ml-2">
+                            (Prochain: {sequence.nextNumber})
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resetSequence(sequence.id)}
+                        >
+                          Réinitialiser
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <Button variant="outline">
-                Réinitialiser maintenant
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Bouton de sauvegarde */}
+        <div className="flex justify-end mt-6">
+          <Button
+            className="bg-ivory-orange hover:bg-ivory-orange/90"
+            onClick={saveSequenceConfig}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Enregistrement...
+              </>
+            ) : (
+              'Enregistrer les modifications'
+            )}
+          </Button>
+        </div>
       </div>
+      )}
     </div>
   );
 };
