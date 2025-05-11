@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, PaymentProvider, ShippingMethod, ExternalService, AuditLog, AuditConfig, Backup, BackupConfig, ThemeConfig, CustomLogo, ImportConfig, ExportConfig, ImportExportHistory, ComplianceConfig, ConsentRecord, CalendarConfig, Holiday, CalendarIntegration, Sequence, SequenceConfig, PerformanceConfig, Sequelize } = require('../models');
+const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, PaymentProvider, ShippingMethod, ExternalService, AuditLog, AuditConfig, Backup, BackupConfig, ThemeConfig, CustomLogo, ImportConfig, ExportConfig, ImportExportHistory, ComplianceConfig, ConsentRecord, CalendarConfig, Holiday, CalendarIntegration, Sequence, SequenceConfig, PerformanceConfig, NotificationChannel, NotificationTemplate, NotificationPreference, Notification, NotificationConfig, Sequelize } = require('../models');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const { Op } = Sequelize;
@@ -6108,6 +6108,747 @@ router.get('/performancemetrics', asyncHandler(async (req, res) => {
   };
 
   res.json(metrics);
+}));
+
+// Routes pour la catégorie "Notifications"
+// 1. Routes pour les canaux de notification
+router.get('/notificationchannels', asyncHandler(async (req, res) => {
+  const channels = await NotificationChannel.findAll({
+    order: [['displayOrder', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedChannels = channels.map(channel => ({
+    id: channel.id.toString(),
+    name: channel.name,
+    type: channel.type,
+    description: channel.description || '',
+    config: channel.config || {},
+    enabled: channel.enabled,
+    displayOrder: channel.displayOrder,
+    icon: channel.icon || channel.type // Utiliser le type comme icône par défaut
+  }));
+
+  res.json(transformedChannels);
+}));
+
+router.post('/notificationchannels', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    description,
+    config,
+    enabled,
+    displayOrder,
+    icon
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !type) {
+    return res.status(400).json({ message: 'Les champs name et type sont requis' });
+  }
+
+  // Créer le canal de notification
+  const channel = await NotificationChannel.create({
+    name,
+    type,
+    description,
+    config,
+    enabled: enabled !== undefined ? enabled : true,
+    displayOrder: displayOrder || 0,
+    icon
+  });
+
+  // Transformer les données
+  const transformedChannel = {
+    id: channel.id.toString(),
+    name: channel.name,
+    type: channel.type,
+    description: channel.description || '',
+    config: channel.config || {},
+    enabled: channel.enabled,
+    displayOrder: channel.displayOrder,
+    icon: channel.icon || channel.type
+  };
+
+  res.status(201).json(transformedChannel);
+}));
+
+router.put('/notificationchannels/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    description,
+    config,
+    enabled,
+    displayOrder,
+    icon
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !type) {
+    return res.status(400).json({ message: 'Les champs name et type sont requis' });
+  }
+
+  const channel = await NotificationChannel.findByPk(req.params.id);
+  if (!channel) {
+    return res.status(404).json({ message: 'Canal de notification non trouvé' });
+  }
+
+  // Mettre à jour le canal
+  await channel.update({
+    name,
+    type,
+    description,
+    config,
+    enabled: enabled !== undefined ? enabled : channel.enabled,
+    displayOrder: displayOrder !== undefined ? displayOrder : channel.displayOrder,
+    icon
+  });
+
+  // Transformer les données
+  const transformedChannel = {
+    id: channel.id.toString(),
+    name: channel.name,
+    type: channel.type,
+    description: channel.description || '',
+    config: channel.config || {},
+    enabled: channel.enabled,
+    displayOrder: channel.displayOrder,
+    icon: channel.icon || channel.type
+  };
+
+  res.json(transformedChannel);
+}));
+
+router.delete('/notificationchannels/:id', asyncHandler(async (req, res) => {
+  const channel = await NotificationChannel.findByPk(req.params.id);
+  if (!channel) {
+    return res.status(404).json({ message: 'Canal de notification non trouvé' });
+  }
+
+  await channel.destroy();
+  res.status(204).end();
+}));
+
+// 2. Routes pour les modèles de notification
+router.get('/notificationtemplates', asyncHandler(async (req, res) => {
+  const templates = await NotificationTemplate.findAll({
+    include: [{ model: NotificationChannel }],
+    order: [['event', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedTemplates = templates.map(template => ({
+    id: template.id.toString(),
+    name: template.name,
+    event: template.event,
+    subject: template.subject || '',
+    content: template.content,
+    htmlContent: template.htmlContent || '',
+    variables: template.variables || [],
+    active: template.active,
+    category: template.category || '',
+    language: template.language,
+    channels: template.NotificationChannels ? template.NotificationChannels.map(channel => ({
+      id: channel.id.toString(),
+      name: channel.name,
+      type: channel.type
+    })) : []
+  }));
+
+  res.json(transformedTemplates);
+}));
+
+router.post('/notificationtemplates', asyncHandler(async (req, res) => {
+  const {
+    name,
+    event,
+    subject,
+    content,
+    htmlContent,
+    variables,
+    active,
+    category,
+    language,
+    channelIds
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !event || !content) {
+    return res.status(400).json({ message: 'Les champs name, event et content sont requis' });
+  }
+
+  // Créer le modèle de notification
+  const template = await NotificationTemplate.create({
+    name,
+    event,
+    subject,
+    content,
+    htmlContent,
+    variables,
+    active: active !== undefined ? active : true,
+    category,
+    language: language || 'fr-FR'
+  });
+
+  // Associer les canaux si fournis
+  if (channelIds && channelIds.length > 0) {
+    await template.setNotificationChannels(channelIds);
+  }
+
+  // Récupérer le modèle avec ses canaux
+  const createdTemplate = await NotificationTemplate.findByPk(template.id, {
+    include: [{ model: NotificationChannel }]
+  });
+
+  // Transformer les données
+  const transformedTemplate = {
+    id: createdTemplate.id.toString(),
+    name: createdTemplate.name,
+    event: createdTemplate.event,
+    subject: createdTemplate.subject || '',
+    content: createdTemplate.content,
+    htmlContent: createdTemplate.htmlContent || '',
+    variables: createdTemplate.variables || [],
+    active: createdTemplate.active,
+    category: createdTemplate.category || '',
+    language: createdTemplate.language,
+    channels: createdTemplate.NotificationChannels ? createdTemplate.NotificationChannels.map(channel => ({
+      id: channel.id.toString(),
+      name: channel.name,
+      type: channel.type
+    })) : []
+  };
+
+  res.status(201).json(transformedTemplate);
+}));
+
+router.put('/notificationtemplates/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    event,
+    subject,
+    content,
+    htmlContent,
+    variables,
+    active,
+    category,
+    language,
+    channelIds
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !event || !content) {
+    return res.status(400).json({ message: 'Les champs name, event et content sont requis' });
+  }
+
+  const template = await NotificationTemplate.findByPk(req.params.id);
+  if (!template) {
+    return res.status(404).json({ message: 'Modèle de notification non trouvé' });
+  }
+
+  // Mettre à jour le modèle
+  await template.update({
+    name,
+    event,
+    subject,
+    content,
+    htmlContent,
+    variables,
+    active: active !== undefined ? active : template.active,
+    category,
+    language: language || template.language
+  });
+
+  // Mettre à jour les associations de canaux si fournis
+  if (channelIds) {
+    await template.setNotificationChannels(channelIds);
+  }
+
+  // Récupérer le modèle mis à jour avec ses canaux
+  const updatedTemplate = await NotificationTemplate.findByPk(template.id, {
+    include: [{ model: NotificationChannel }]
+  });
+
+  // Transformer les données
+  const transformedTemplate = {
+    id: updatedTemplate.id.toString(),
+    name: updatedTemplate.name,
+    event: updatedTemplate.event,
+    subject: updatedTemplate.subject || '',
+    content: updatedTemplate.content,
+    htmlContent: updatedTemplate.htmlContent || '',
+    variables: updatedTemplate.variables || [],
+    active: updatedTemplate.active,
+    category: updatedTemplate.category || '',
+    language: updatedTemplate.language,
+    channels: updatedTemplate.NotificationChannels ? updatedTemplate.NotificationChannels.map(channel => ({
+      id: channel.id.toString(),
+      name: channel.name,
+      type: channel.type
+    })) : []
+  };
+
+  res.json(transformedTemplate);
+}));
+
+router.delete('/notificationtemplates/:id', asyncHandler(async (req, res) => {
+  const template = await NotificationTemplate.findByPk(req.params.id);
+  if (!template) {
+    return res.status(404).json({ message: 'Modèle de notification non trouvé' });
+  }
+
+  await template.destroy();
+  res.status(204).end();
+}));
+
+// 3. Routes pour les préférences de notification
+router.get('/notificationpreferences', asyncHandler(async (req, res) => {
+  const preferences = await NotificationPreference.findAll({
+    include: [{ model: User, as: 'user' }],
+    order: [['userId', 'ASC'], ['eventType', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedPreferences = preferences.map(pref => ({
+    id: pref.id.toString(),
+    userId: pref.userId.toString(),
+    userName: pref.user ? `${pref.user.firstName} ${pref.user.lastName}` : 'Inconnu',
+    eventType: pref.eventType,
+    enabledChannels: pref.enabledChannels || [],
+    frequency: pref.frequency,
+    preferredTime: pref.preferredTime,
+    preferredDay: pref.preferredDay,
+    enabled: pref.enabled
+  }));
+
+  res.json(transformedPreferences);
+}));
+
+router.get('/notificationpreferences/user/:userId', asyncHandler(async (req, res) => {
+  const preferences = await NotificationPreference.findAll({
+    where: { userId: req.params.userId },
+    order: [['eventType', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedPreferences = preferences.map(pref => ({
+    id: pref.id.toString(),
+    userId: pref.userId.toString(),
+    eventType: pref.eventType,
+    enabledChannels: pref.enabledChannels || [],
+    frequency: pref.frequency,
+    preferredTime: pref.preferredTime,
+    preferredDay: pref.preferredDay,
+    enabled: pref.enabled
+  }));
+
+  res.json(transformedPreferences);
+}));
+
+router.post('/notificationpreferences', asyncHandler(async (req, res) => {
+  const {
+    userId,
+    eventType,
+    enabledChannels,
+    frequency,
+    preferredTime,
+    preferredDay,
+    enabled
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!userId || !eventType) {
+    return res.status(400).json({ message: 'Les champs userId et eventType sont requis' });
+  }
+
+  // Vérifier si une préférence existe déjà pour cet utilisateur et cet événement
+  const existingPreference = await NotificationPreference.findOne({
+    where: { userId, eventType }
+  });
+
+  if (existingPreference) {
+    return res.status(400).json({ message: 'Une préférence existe déjà pour cet utilisateur et cet événement' });
+  }
+
+  // Créer la préférence
+  const preference = await NotificationPreference.create({
+    userId,
+    eventType,
+    enabledChannels: enabledChannels || [],
+    frequency: frequency || 'immediate',
+    preferredTime,
+    preferredDay,
+    enabled: enabled !== undefined ? enabled : true
+  });
+
+  // Transformer les données
+  const transformedPreference = {
+    id: preference.id.toString(),
+    userId: preference.userId.toString(),
+    eventType: preference.eventType,
+    enabledChannels: preference.enabledChannels || [],
+    frequency: preference.frequency,
+    preferredTime: preference.preferredTime,
+    preferredDay: preference.preferredDay,
+    enabled: preference.enabled
+  };
+
+  res.status(201).json(transformedPreference);
+}));
+
+router.put('/notificationpreferences/:id', asyncHandler(async (req, res) => {
+  const {
+    enabledChannels,
+    frequency,
+    preferredTime,
+    preferredDay,
+    enabled
+  } = req.body;
+
+  const preference = await NotificationPreference.findByPk(req.params.id);
+  if (!preference) {
+    return res.status(404).json({ message: 'Préférence de notification non trouvée' });
+  }
+
+  // Mettre à jour la préférence
+  await preference.update({
+    enabledChannels: enabledChannels || preference.enabledChannels,
+    frequency: frequency || preference.frequency,
+    preferredTime: preferredTime !== undefined ? preferredTime : preference.preferredTime,
+    preferredDay: preferredDay !== undefined ? preferredDay : preference.preferredDay,
+    enabled: enabled !== undefined ? enabled : preference.enabled
+  });
+
+  // Transformer les données
+  const transformedPreference = {
+    id: preference.id.toString(),
+    userId: preference.userId.toString(),
+    eventType: preference.eventType,
+    enabledChannels: preference.enabledChannels || [],
+    frequency: preference.frequency,
+    preferredTime: preference.preferredTime,
+    preferredDay: preference.preferredDay,
+    enabled: preference.enabled
+  };
+
+  res.json(transformedPreference);
+}));
+
+router.delete('/notificationpreferences/:id', asyncHandler(async (req, res) => {
+  const preference = await NotificationPreference.findByPk(req.params.id);
+  if (!preference) {
+    return res.status(404).json({ message: 'Préférence de notification non trouvée' });
+  }
+
+  await preference.destroy();
+  res.status(204).end();
+}));
+
+// 4. Routes pour les notifications
+router.get('/notifications', asyncHandler(async (req, res) => {
+  const notifications = await Notification.findAll({
+    include: [
+      { model: User, as: 'user' },
+      { model: NotificationTemplate, as: 'template' }
+    ],
+    order: [['createdAt', 'DESC']],
+    limit: 100
+  });
+
+  // Transformer les données
+  const transformedNotifications = notifications.map(notification => ({
+    id: notification.id.toString(),
+    userId: notification.userId.toString(),
+    userName: notification.user ? `${notification.user.firstName} ${notification.user.lastName}` : 'Inconnu',
+    templateId: notification.templateId ? notification.templateId.toString() : null,
+    templateName: notification.template ? notification.template.name : null,
+    type: notification.type,
+    title: notification.title,
+    content: notification.content,
+    data: notification.data || {},
+    channel: notification.channel,
+    status: notification.status,
+    readAt: notification.readAt ? notification.readAt.toISOString() : null,
+    scheduledFor: notification.scheduledFor ? notification.scheduledFor.toISOString() : null,
+    priority: notification.priority,
+    actionUrl: notification.actionUrl || '',
+    actionText: notification.actionText || '',
+    createdAt: notification.createdAt.toISOString()
+  }));
+
+  res.json(transformedNotifications);
+}));
+
+router.get('/notifications/user/:userId', asyncHandler(async (req, res) => {
+  const notifications = await Notification.findAll({
+    where: { userId: req.params.userId },
+    include: [{ model: NotificationTemplate, as: 'template' }],
+    order: [['createdAt', 'DESC']],
+    limit: 50
+  });
+
+  // Transformer les données
+  const transformedNotifications = notifications.map(notification => ({
+    id: notification.id.toString(),
+    userId: notification.userId.toString(),
+    templateId: notification.templateId ? notification.templateId.toString() : null,
+    templateName: notification.template ? notification.template.name : null,
+    type: notification.type,
+    title: notification.title,
+    content: notification.content,
+    data: notification.data || {},
+    channel: notification.channel,
+    status: notification.status,
+    readAt: notification.readAt ? notification.readAt.toISOString() : null,
+    scheduledFor: notification.scheduledFor ? notification.scheduledFor.toISOString() : null,
+    priority: notification.priority,
+    actionUrl: notification.actionUrl || '',
+    actionText: notification.actionText || '',
+    createdAt: notification.createdAt.toISOString()
+  }));
+
+  res.json(transformedNotifications);
+}));
+
+router.post('/notifications', asyncHandler(async (req, res) => {
+  const {
+    userId,
+    templateId,
+    type,
+    title,
+    content,
+    data,
+    channel,
+    status,
+    scheduledFor,
+    priority,
+    actionUrl,
+    actionText
+  } = req.body;
+
+  // Vérifier les données requises
+  if (!userId || !type || !title || !content || !channel) {
+    return res.status(400).json({ message: 'Les champs userId, type, title, content et channel sont requis' });
+  }
+
+  // Créer la notification
+  const notification = await Notification.create({
+    userId,
+    templateId,
+    type,
+    title,
+    content,
+    data,
+    channel,
+    status: status || 'pending',
+    scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+    priority: priority || 'normal',
+    actionUrl,
+    actionText
+  });
+
+  // Transformer les données
+  const transformedNotification = {
+    id: notification.id.toString(),
+    userId: notification.userId.toString(),
+    templateId: notification.templateId ? notification.templateId.toString() : null,
+    type: notification.type,
+    title: notification.title,
+    content: notification.content,
+    data: notification.data || {},
+    channel: notification.channel,
+    status: notification.status,
+    readAt: notification.readAt ? notification.readAt.toISOString() : null,
+    scheduledFor: notification.scheduledFor ? notification.scheduledFor.toISOString() : null,
+    priority: notification.priority,
+    actionUrl: notification.actionUrl || '',
+    actionText: notification.actionText || '',
+    createdAt: notification.createdAt.toISOString()
+  };
+
+  res.status(201).json(transformedNotification);
+}));
+
+router.put('/notifications/:id/read', asyncHandler(async (req, res) => {
+  const notification = await Notification.findByPk(req.params.id);
+  if (!notification) {
+    return res.status(404).json({ message: 'Notification non trouvée' });
+  }
+
+  // Marquer comme lue
+  await notification.update({
+    status: 'read',
+    readAt: new Date()
+  });
+
+  // Transformer les données
+  const transformedNotification = {
+    id: notification.id.toString(),
+    userId: notification.userId.toString(),
+    templateId: notification.templateId ? notification.templateId.toString() : null,
+    type: notification.type,
+    title: notification.title,
+    content: notification.content,
+    data: notification.data || {},
+    channel: notification.channel,
+    status: notification.status,
+    readAt: notification.readAt ? notification.readAt.toISOString() : null,
+    scheduledFor: notification.scheduledFor ? notification.scheduledFor.toISOString() : null,
+    priority: notification.priority,
+    actionUrl: notification.actionUrl || '',
+    actionText: notification.actionText || '',
+    createdAt: notification.createdAt.toISOString()
+  };
+
+  res.json(transformedNotification);
+}));
+
+router.delete('/notifications/:id', asyncHandler(async (req, res) => {
+  const notification = await Notification.findByPk(req.params.id);
+  if (!notification) {
+    return res.status(404).json({ message: 'Notification non trouvée' });
+  }
+
+  await notification.destroy();
+  res.status(204).end();
+}));
+
+// 5. Routes pour la configuration des notifications
+router.get('/notificationconfig', asyncHandler(async (req, res) => {
+  // Récupérer la configuration des notifications (il ne devrait y avoir qu'une seule entrée)
+  let config = await NotificationConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await NotificationConfig.create({
+      emailEnabled: true,
+      smsEnabled: true,
+      inAppEnabled: true,
+      webhookEnabled: true,
+      maxRetries: 3,
+      retryDelay: 15,
+      retentionPeriod: 90,
+      maxNotificationsPerDay: 50,
+      batchingEnabled: true,
+      batchingInterval: 15,
+      advancedSettings: {
+        emailThrottling: {
+          enabled: true,
+          maxPerHour: 100,
+          maxPerDay: 500
+        },
+        smsThrottling: {
+          enabled: true,
+          maxPerHour: 20,
+          maxPerDay: 100
+        },
+        prioritySettings: {
+          highPriorityBypass: true,
+          lowPriorityDelay: 60
+        },
+        deliveryHours: {
+          enabled: true,
+          start: '08:00',
+          end: '20:00',
+          timezone: 'Europe/Paris',
+          respectWeekends: true
+        },
+        templates: {
+          defaultLanguage: 'fr-FR',
+          fallbackLanguage: 'en-US'
+        }
+      }
+    });
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    emailEnabled: config.emailEnabled,
+    smsEnabled: config.smsEnabled,
+    inAppEnabled: config.inAppEnabled,
+    webhookEnabled: config.webhookEnabled,
+    maxRetries: config.maxRetries,
+    retryDelay: config.retryDelay,
+    retentionPeriod: config.retentionPeriod,
+    maxNotificationsPerDay: config.maxNotificationsPerDay,
+    batchingEnabled: config.batchingEnabled,
+    batchingInterval: config.batchingInterval,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
+}));
+
+router.put('/notificationconfig', asyncHandler(async (req, res) => {
+  const {
+    emailEnabled,
+    smsEnabled,
+    inAppEnabled,
+    webhookEnabled,
+    maxRetries,
+    retryDelay,
+    retentionPeriod,
+    maxNotificationsPerDay,
+    batchingEnabled,
+    batchingInterval,
+    advancedSettings
+  } = req.body;
+
+  // Récupérer la configuration des notifications (il ne devrait y avoir qu'une seule entrée)
+  let config = await NotificationConfig.findOne();
+
+  // Si aucune configuration n'existe, créer une configuration par défaut
+  if (!config) {
+    config = await NotificationConfig.create({
+      emailEnabled: emailEnabled !== undefined ? emailEnabled : true,
+      smsEnabled: smsEnabled !== undefined ? smsEnabled : true,
+      inAppEnabled: inAppEnabled !== undefined ? inAppEnabled : true,
+      webhookEnabled: webhookEnabled !== undefined ? webhookEnabled : true,
+      maxRetries: maxRetries || 3,
+      retryDelay: retryDelay || 15,
+      retentionPeriod: retentionPeriod || 90,
+      maxNotificationsPerDay: maxNotificationsPerDay || 50,
+      batchingEnabled: batchingEnabled !== undefined ? batchingEnabled : true,
+      batchingInterval: batchingInterval || 15,
+      advancedSettings: advancedSettings || {}
+    });
+  } else {
+    // Mettre à jour les champs
+    if (emailEnabled !== undefined) config.emailEnabled = emailEnabled;
+    if (smsEnabled !== undefined) config.smsEnabled = smsEnabled;
+    if (inAppEnabled !== undefined) config.inAppEnabled = inAppEnabled;
+    if (webhookEnabled !== undefined) config.webhookEnabled = webhookEnabled;
+    if (maxRetries !== undefined) config.maxRetries = maxRetries;
+    if (retryDelay !== undefined) config.retryDelay = retryDelay;
+    if (retentionPeriod !== undefined) config.retentionPeriod = retentionPeriod;
+    if (maxNotificationsPerDay !== undefined) config.maxNotificationsPerDay = maxNotificationsPerDay;
+    if (batchingEnabled !== undefined) config.batchingEnabled = batchingEnabled;
+    if (batchingInterval !== undefined) config.batchingInterval = batchingInterval;
+    if (advancedSettings !== undefined) config.advancedSettings = advancedSettings;
+
+    await config.save();
+  }
+
+  // Transformer les données
+  const transformedConfig = {
+    id: config.id.toString(),
+    emailEnabled: config.emailEnabled,
+    smsEnabled: config.smsEnabled,
+    inAppEnabled: config.inAppEnabled,
+    webhookEnabled: config.webhookEnabled,
+    maxRetries: config.maxRetries,
+    retryDelay: config.retryDelay,
+    retentionPeriod: config.retentionPeriod,
+    maxNotificationsPerDay: config.maxNotificationsPerDay,
+    batchingEnabled: config.batchingEnabled,
+    batchingInterval: config.batchingInterval,
+    advancedSettings: config.advancedSettings || {}
+  };
+
+  res.json(transformedConfig);
 }));
 
 module.exports = router;

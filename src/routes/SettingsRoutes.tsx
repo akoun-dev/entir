@@ -29,7 +29,7 @@ import PrintersSettings from '../pages/settings/PrintersSettings';
 import PaymentProvidersSettings from '../pages/settings/PaymentProvidersSettings';
 import ShippingMethodsSettings from '../pages/settings/ShippingMethodsSettings';
 import ExternalServicesSettings from '../pages/settings/ExternalServicesSettings';
-import NotificationsSettings from '../pages/settings/NotificationsSettings';
+import NotificationSettings from '../pages/settings/NotificationSettings';
 import AuditSettings from '../pages/settings/AuditSettings';
 import BackupSettings from '../pages/settings/BackupSettings';
 import AppearanceSettings from '../pages/settings/AppearanceSettings';
@@ -86,7 +86,7 @@ const SettingsRoutes = (
     <Route path="shipping-methods" element={<ShippingMethodsSettings />} />
     <Route path="external-services" element={<ExternalServicesSettings />} />
     {/* Nouveaux paramètres */}
-    <Route path="notifications" element={<NotificationsSettings />} />
+    <Route path="notifications" element={<NotificationSettings />} />
     <Route path="audit" element={<AuditSettings />} />
     <Route path="backup" element={<BackupSettings />} />
     <Route path="appearance" element={<AppearanceSettings />} />
