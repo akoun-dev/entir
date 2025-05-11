@@ -2,8 +2,9 @@
 
 const express = require('express');
 const router = express.Router();
-const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, Sequelize } = require('../models');
+const { User, Group, Parameter, Currency, Country, Language, DateFormat, NumberFormat, TimeFormat, Translation, EmailServer, SecuritySetting, ApiKey, AutomationRule, LoggingSetting, DocumentLayout, ReportTemplate, Printer, Sequelize } = require('../models');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { Op } = Sequelize;
 
 // Middleware pour gérer les erreurs
@@ -1931,6 +1932,1804 @@ router.patch('/timeformats/:id/set-default', asyncHandler(async (req, res) => {
   };
 
   res.json(transformedTimeFormat);
+}));
+
+// Routes pour les serveurs d'email
+router.get('/emailservers', asyncHandler(async (req, res) => {
+  const emailServers = await EmailServer.findAll();
+
+  // Transformer les données
+  const transformedEmailServers = emailServers.map(server => ({
+    id: server.id.toString(),
+    name: server.name,
+    protocol: server.protocol,
+    host: server.host,
+    port: server.port,
+    username: server.username,
+    // Ne pas renvoyer le mot de passe pour des raisons de sécurité
+    password: server.password ? '********' : '',
+    encryption: server.encryption,
+    from_email: server.from_email,
+    from_name: server.from_name,
+    is_default: server.is_default,
+    active: server.active
+  }));
+
+  res.json(transformedEmailServers);
+}));
+
+router.get('/emailservers/:id', asyncHandler(async (req, res) => {
+  const emailServer = await EmailServer.findByPk(req.params.id);
+
+  if (!emailServer) {
+    return res.status(404).json({ message: 'Serveur d\'email non trouvé' });
+  }
+
+  // Transformer les données
+  const transformedEmailServer = {
+    id: emailServer.id.toString(),
+    name: emailServer.name,
+    protocol: emailServer.protocol,
+    host: emailServer.host,
+    port: emailServer.port,
+    username: emailServer.username,
+    // Ne pas renvoyer le mot de passe pour des raisons de sécurité
+    password: emailServer.password ? '********' : '',
+    encryption: emailServer.encryption,
+    from_email: emailServer.from_email,
+    from_name: emailServer.from_name,
+    is_default: emailServer.is_default,
+    active: emailServer.active
+  };
+
+  res.json(transformedEmailServer);
+}));
+
+router.post('/emailservers', asyncHandler(async (req, res) => {
+  const { name, protocol, host, port, username, password, encryption, from_email, from_name, is_default, active } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !host || !from_email || !from_name) {
+    return res.status(400).json({ message: 'Les champs name, host, from_email et from_name sont requis' });
+  }
+
+  // Vérifier si le serveur existe déjà
+  const existingServer = await EmailServer.findOne({
+    where: { name }
+  });
+
+  if (existingServer) {
+    return res.status(400).json({ message: 'Un serveur d\'email avec ce nom existe déjà' });
+  }
+
+  // Si ce serveur est défini comme serveur par défaut, désactiver les autres serveurs par défaut
+  if (is_default) {
+    await EmailServer.update(
+      { is_default: false },
+      { where: { is_default: true } }
+    );
+  }
+
+  // Créer le serveur
+  const emailServer = await EmailServer.create({
+    name,
+    protocol: protocol || 'smtp',
+    host,
+    port: port || 587,
+    username,
+    password,
+    encryption: encryption || 'tls',
+    from_email,
+    from_name,
+    is_default: is_default !== undefined ? is_default : false,
+    active: active !== undefined ? active : true
+  });
+
+  // Transformer les données
+  const transformedEmailServer = {
+    id: emailServer.id.toString(),
+    name: emailServer.name,
+    protocol: emailServer.protocol,
+    host: emailServer.host,
+    port: emailServer.port,
+    username: emailServer.username,
+    // Ne pas renvoyer le mot de passe pour des raisons de sécurité
+    password: emailServer.password ? '********' : '',
+    encryption: emailServer.encryption,
+    from_email: emailServer.from_email,
+    from_name: emailServer.from_name,
+    is_default: emailServer.is_default,
+    active: emailServer.active
+  };
+
+  res.status(201).json(transformedEmailServer);
+}));
+
+router.put('/emailservers/:id', asyncHandler(async (req, res) => {
+  const { name, protocol, host, port, username, password, encryption, from_email, from_name, is_default, active } = req.body;
+
+  // Vérifier les données requises
+  if (!name || !host || !from_email || !from_name) {
+    return res.status(400).json({ message: 'Les champs name, host, from_email et from_name sont requis' });
+  }
+
+  const emailServer = await EmailServer.findByPk(req.params.id);
+  if (!emailServer) {
+    return res.status(404).json({ message: 'Serveur d\'email non trouvé' });
+  }
+
+  // Vérifier si le nom est déjà utilisé par un autre serveur
+  if (name !== emailServer.name) {
+    const existingServer = await EmailServer.findOne({
+      where: { name }
+    });
+
+    if (existingServer && existingServer.id !== emailServer.id) {
+      return res.status(400).json({ message: 'Un serveur d\'email avec ce nom existe déjà' });
+    }
+  }
+
+  // Si ce serveur est défini comme serveur par défaut, désactiver les autres serveurs par défaut
+  if (is_default && !emailServer.is_default) {
+    await EmailServer.update(
+      { is_default: false },
+      {
+        where: {
+          is_default: true,
+          id: { [Op.ne]: emailServer.id }
+        }
+      }
+    );
+  }
+
+  // Mettre à jour les champs
+  emailServer.name = name;
+  if (protocol) emailServer.protocol = protocol;
+  emailServer.host = host;
+  if (port) emailServer.port = port;
+  if (username !== undefined) emailServer.username = username;
+  if (password && password !== '********') emailServer.password = password;
+  if (encryption) emailServer.encryption = encryption;
+  emailServer.from_email = from_email;
+  emailServer.from_name = from_name;
+  if (is_default !== undefined) emailServer.is_default = is_default;
+  if (active !== undefined) emailServer.active = active;
+
+  await emailServer.save();
+
+  // Transformer les données
+  const transformedEmailServer = {
+    id: emailServer.id.toString(),
+    name: emailServer.name,
+    protocol: emailServer.protocol,
+    host: emailServer.host,
+    port: emailServer.port,
+    username: emailServer.username,
+    // Ne pas renvoyer le mot de passe pour des raisons de sécurité
+    password: emailServer.password ? '********' : '',
+    encryption: emailServer.encryption,
+    from_email: emailServer.from_email,
+    from_name: emailServer.from_name,
+    is_default: emailServer.is_default,
+    active: emailServer.active
+  };
+
+  res.json(transformedEmailServer);
+}));
+
+router.delete('/emailservers/:id', asyncHandler(async (req, res) => {
+  const emailServer = await EmailServer.findByPk(req.params.id);
+  if (!emailServer) {
+    return res.status(404).json({ message: 'Serveur d\'email non trouvé' });
+  }
+
+  // Empêcher la suppression d'un serveur par défaut
+  if (emailServer.is_default) {
+    return res.status(400).json({ message: 'Impossible de supprimer un serveur par défaut. Veuillez d\'abord définir un autre serveur comme serveur par défaut.' });
+  }
+
+  await emailServer.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/emailservers/:id/toggle-status', asyncHandler(async (req, res) => {
+  const emailServer = await EmailServer.findByPk(req.params.id);
+  if (!emailServer) {
+    return res.status(404).json({ message: 'Serveur d\'email non trouvé' });
+  }
+
+  // Empêcher la désactivation d'un serveur par défaut
+  if (emailServer.is_default && emailServer.active) {
+    return res.status(400).json({ message: 'Impossible de désactiver un serveur par défaut. Veuillez d\'abord définir un autre serveur comme serveur par défaut.' });
+  }
+
+  emailServer.active = !emailServer.active;
+  await emailServer.save();
+
+  // Transformer les données
+  const transformedEmailServer = {
+    id: emailServer.id.toString(),
+    name: emailServer.name,
+    protocol: emailServer.protocol,
+    host: emailServer.host,
+    port: emailServer.port,
+    username: emailServer.username,
+    // Ne pas renvoyer le mot de passe pour des raisons de sécurité
+    password: emailServer.password ? '********' : '',
+    encryption: emailServer.encryption,
+    from_email: emailServer.from_email,
+    from_name: emailServer.from_name,
+    is_default: emailServer.is_default,
+    active: emailServer.active
+  };
+
+  res.json(transformedEmailServer);
+}));
+
+router.patch('/emailservers/:id/set-default', asyncHandler(async (req, res) => {
+  const emailServer = await EmailServer.findByPk(req.params.id);
+  if (!emailServer) {
+    return res.status(404).json({ message: 'Serveur d\'email non trouvé' });
+  }
+
+  // Vérifier si le serveur est actif
+  if (!emailServer.active) {
+    return res.status(400).json({ message: 'Impossible de définir un serveur inactif comme serveur par défaut' });
+  }
+
+  // Désactiver tous les serveurs par défaut
+  await EmailServer.update(
+    { is_default: false },
+    { where: { is_default: true } }
+  );
+
+  // Définir ce serveur comme serveur par défaut
+  emailServer.is_default = true;
+  await emailServer.save();
+
+  // Transformer les données
+  const transformedEmailServer = {
+    id: emailServer.id.toString(),
+    name: emailServer.name,
+    protocol: emailServer.protocol,
+    host: emailServer.host,
+    port: emailServer.port,
+    username: emailServer.username,
+    // Ne pas renvoyer le mot de passe pour des raisons de sécurité
+    password: emailServer.password ? '********' : '',
+    encryption: emailServer.encryption,
+    from_email: emailServer.from_email,
+    from_name: emailServer.from_name,
+    is_default: emailServer.is_default,
+    active: emailServer.active
+  };
+
+  res.json(transformedEmailServer);
+}));
+
+router.post('/emailservers/:id/test', asyncHandler(async (req, res) => {
+  const emailServer = await EmailServer.findByPk(req.params.id);
+  if (!emailServer) {
+    return res.status(404).json({ message: 'Serveur d\'email non trouvé' });
+  }
+
+  // Simuler un test de connexion SMTP
+  // Dans une application réelle, vous utiliseriez une bibliothèque comme nodemailer pour tester la connexion
+
+  // Simuler un délai pour le test
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  // Simuler un succès ou un échec aléatoire
+  const success = Math.random() > 0.2; // 80% de chances de succès
+
+  if (success) {
+    res.json({ success: true, message: 'Connexion au serveur SMTP réussie' });
+  } else {
+    res.status(500).json({ success: false, message: 'Échec de la connexion au serveur SMTP. Vérifiez vos paramètres et réessayez.' });
+  }
+}));
+
+// Routes pour les paramètres de sécurité
+router.get('/securitysettings', asyncHandler(async (req, res) => {
+  const securitySettings = await SecuritySetting.findAll();
+
+  // Transformer les données
+  const transformedSettings = securitySettings.map(setting => {
+    // Convertir la valeur selon le type
+    let parsedValue = setting.value;
+    if (setting.valueType === 'boolean') {
+      parsedValue = setting.value === 'true';
+    } else if (setting.valueType === 'number') {
+      parsedValue = parseFloat(setting.value);
+    } else if (setting.valueType === 'json') {
+      try {
+        parsedValue = JSON.parse(setting.value);
+      } catch (error) {
+        console.error(`Erreur lors de l'analyse JSON pour ${setting.key}:`, error);
+      }
+    }
+
+    return {
+      id: setting.id.toString(),
+      key: setting.key,
+      value: parsedValue,
+      description: setting.description || '',
+      valueType: setting.valueType,
+      category: setting.category
+    };
+  });
+
+  res.json(transformedSettings);
+}));
+
+router.get('/securitysettings/category/:category', asyncHandler(async (req, res) => {
+  const securitySettings = await SecuritySetting.findAll({
+    where: { category: req.params.category }
+  });
+
+  // Transformer les données
+  const transformedSettings = securitySettings.map(setting => {
+    // Convertir la valeur selon le type
+    let parsedValue = setting.value;
+    if (setting.valueType === 'boolean') {
+      parsedValue = setting.value === 'true';
+    } else if (setting.valueType === 'number') {
+      parsedValue = parseFloat(setting.value);
+    } else if (setting.valueType === 'json') {
+      try {
+        parsedValue = JSON.parse(setting.value);
+      } catch (error) {
+        console.error(`Erreur lors de l'analyse JSON pour ${setting.key}:`, error);
+      }
+    }
+
+    return {
+      id: setting.id.toString(),
+      key: setting.key,
+      value: parsedValue,
+      description: setting.description || '',
+      valueType: setting.valueType,
+      category: setting.category
+    };
+  });
+
+  res.json(transformedSettings);
+}));
+
+router.get('/securitysettings/key/:key', asyncHandler(async (req, res) => {
+  const securitySetting = await SecuritySetting.findOne({
+    where: { key: req.params.key }
+  });
+
+  if (!securitySetting) {
+    return res.status(404).json({ message: 'Paramètre de sécurité non trouvé' });
+  }
+
+  // Convertir la valeur selon le type
+  let parsedValue = securitySetting.value;
+  if (securitySetting.valueType === 'boolean') {
+    parsedValue = securitySetting.value === 'true';
+  } else if (securitySetting.valueType === 'number') {
+    parsedValue = parseFloat(securitySetting.value);
+  } else if (securitySetting.valueType === 'json') {
+    try {
+      parsedValue = JSON.parse(securitySetting.value);
+    } catch (error) {
+      console.error(`Erreur lors de l'analyse JSON pour ${securitySetting.key}:`, error);
+    }
+  }
+
+  // Transformer les données
+  const transformedSetting = {
+    id: securitySetting.id.toString(),
+    key: securitySetting.key,
+    value: parsedValue,
+    description: securitySetting.description || '',
+    valueType: securitySetting.valueType,
+    category: securitySetting.category
+  };
+
+  res.json(transformedSetting);
+}));
+
+router.put('/securitysettings/key/:key', asyncHandler(async (req, res) => {
+  const { value } = req.body;
+
+  const securitySetting = await SecuritySetting.findOne({
+    where: { key: req.params.key }
+  });
+
+  if (!securitySetting) {
+    return res.status(404).json({ message: 'Paramètre de sécurité non trouvé' });
+  }
+
+  // Convertir la valeur selon le type avant de la stocker
+  let stringValue = value;
+  if (securitySetting.valueType === 'boolean') {
+    stringValue = value.toString();
+  } else if (securitySetting.valueType === 'number') {
+    stringValue = value.toString();
+  } else if (securitySetting.valueType === 'json') {
+    stringValue = JSON.stringify(value);
+  }
+
+  securitySetting.value = stringValue;
+  await securitySetting.save();
+
+  // Convertir la valeur selon le type pour la réponse
+  let parsedValue = securitySetting.value;
+  if (securitySetting.valueType === 'boolean') {
+    parsedValue = securitySetting.value === 'true';
+  } else if (securitySetting.valueType === 'number') {
+    parsedValue = parseFloat(securitySetting.value);
+  } else if (securitySetting.valueType === 'json') {
+    try {
+      parsedValue = JSON.parse(securitySetting.value);
+    } catch (error) {
+      console.error(`Erreur lors de l'analyse JSON pour ${securitySetting.key}:`, error);
+    }
+  }
+
+  // Transformer les données
+  const transformedSetting = {
+    id: securitySetting.id.toString(),
+    key: securitySetting.key,
+    value: parsedValue,
+    description: securitySetting.description || '',
+    valueType: securitySetting.valueType,
+    category: securitySetting.category
+  };
+
+  res.json(transformedSetting);
+}));
+
+router.put('/securitysettings/batch', asyncHandler(async (req, res) => {
+  const { settings } = req.body;
+
+  const updatedSettings = [];
+
+  for (const setting of settings) {
+    const securitySetting = await SecuritySetting.findOne({
+      where: { key: setting.key }
+    });
+
+    if (securitySetting) {
+      // Convertir la valeur selon le type avant de la stocker
+      let stringValue = setting.value;
+      if (securitySetting.valueType === 'boolean') {
+        stringValue = setting.value.toString();
+      } else if (securitySetting.valueType === 'number') {
+        stringValue = setting.value.toString();
+      } else if (securitySetting.valueType === 'json') {
+        stringValue = JSON.stringify(setting.value);
+      }
+
+      securitySetting.value = stringValue;
+      await securitySetting.save();
+
+      // Convertir la valeur selon le type pour la réponse
+      let parsedValue = securitySetting.value;
+      if (securitySetting.valueType === 'boolean') {
+        parsedValue = securitySetting.value === 'true';
+      } else if (securitySetting.valueType === 'number') {
+        parsedValue = parseFloat(securitySetting.value);
+      } else if (securitySetting.valueType === 'json') {
+        try {
+          parsedValue = JSON.parse(securitySetting.value);
+        } catch (error) {
+          console.error(`Erreur lors de l'analyse JSON pour ${securitySetting.key}:`, error);
+        }
+      }
+
+      updatedSettings.push({
+        id: securitySetting.id.toString(),
+        key: securitySetting.key,
+        value: parsedValue,
+        description: securitySetting.description || '',
+        valueType: securitySetting.valueType,
+        category: securitySetting.category
+      });
+    }
+  }
+
+  res.json(updatedSettings);
+}));
+
+// Routes pour les clés API
+router.get('/apikeys', asyncHandler(async (req, res) => {
+  const apiKeys = await ApiKey.findAll();
+
+  // Transformer les données
+  const transformedApiKeys = apiKeys.map(apiKey => ({
+    id: apiKey.id.toString(),
+    name: apiKey.name,
+    key: apiKey.masked_key, // Utiliser la clé masquée pour la sécurité
+    permissions: apiKey.permissions,
+    active: apiKey.active,
+    expires_at: apiKey.expires_at ? apiKey.expires_at.toISOString() : null,
+    last_used_at: apiKey.last_used_at ? apiKey.last_used_at.toISOString() : null,
+    description: apiKey.description || '',
+    createdAt: apiKey.createdAt.toISOString()
+  }));
+
+  res.json(transformedApiKeys);
+}));
+
+router.get('/apikeys/:id', asyncHandler(async (req, res) => {
+  const apiKey = await ApiKey.findByPk(req.params.id);
+
+  if (!apiKey) {
+    return res.status(404).json({ message: 'Clé API non trouvée' });
+  }
+
+  // Transformer les données
+  const transformedApiKey = {
+    id: apiKey.id.toString(),
+    name: apiKey.name,
+    key: apiKey.masked_key, // Utiliser la clé masquée pour la sécurité
+    permissions: apiKey.permissions,
+    active: apiKey.active,
+    expires_at: apiKey.expires_at ? apiKey.expires_at.toISOString() : null,
+    last_used_at: apiKey.last_used_at ? apiKey.last_used_at.toISOString() : null,
+    description: apiKey.description || '',
+    createdAt: apiKey.createdAt.toISOString()
+  };
+
+  res.json(transformedApiKey);
+}));
+
+router.post('/apikeys', asyncHandler(async (req, res) => {
+  const { name, permissions, active, expires_at, description } = req.body;
+
+  // Générer une nouvelle clé API
+  const key = 'sk_' + crypto.randomBytes(24).toString('hex');
+
+  // Créer la clé API
+  const apiKey = await ApiKey.create({
+    name,
+    key,
+    permissions: permissions || ['read'],
+    active: active !== undefined ? active : true,
+    expires_at: expires_at || null,
+    description
+  });
+
+  // Transformer les données
+  const transformedApiKey = {
+    id: apiKey.id.toString(),
+    name: apiKey.name,
+    key: apiKey.key, // Renvoyer la clé complète lors de la création
+    permissions: apiKey.permissions,
+    active: apiKey.active,
+    expires_at: apiKey.expires_at ? apiKey.expires_at.toISOString() : null,
+    last_used_at: apiKey.last_used_at ? apiKey.last_used_at.toISOString() : null,
+    description: apiKey.description || '',
+    createdAt: apiKey.createdAt.toISOString()
+  };
+
+  res.status(201).json(transformedApiKey);
+}));
+
+router.put('/apikeys/:id', asyncHandler(async (req, res) => {
+  const { name, permissions, active, expires_at, description } = req.body;
+
+  const apiKey = await ApiKey.findByPk(req.params.id);
+  if (!apiKey) {
+    return res.status(404).json({ message: 'Clé API non trouvée' });
+  }
+
+  // Mettre à jour les champs
+  if (name) apiKey.name = name;
+  if (permissions) apiKey.permissions = permissions;
+  if (active !== undefined) apiKey.active = active;
+  if (expires_at !== undefined) apiKey.expires_at = expires_at;
+  if (description !== undefined) apiKey.description = description;
+
+  await apiKey.save();
+
+  // Transformer les données
+  const transformedApiKey = {
+    id: apiKey.id.toString(),
+    name: apiKey.name,
+    key: apiKey.masked_key, // Utiliser la clé masquée pour la sécurité
+    permissions: apiKey.permissions,
+    active: apiKey.active,
+    expires_at: apiKey.expires_at ? apiKey.expires_at.toISOString() : null,
+    last_used_at: apiKey.last_used_at ? apiKey.last_used_at.toISOString() : null,
+    description: apiKey.description || '',
+    createdAt: apiKey.createdAt.toISOString()
+  };
+
+  res.json(transformedApiKey);
+}));
+
+router.delete('/apikeys/:id', asyncHandler(async (req, res) => {
+  const apiKey = await ApiKey.findByPk(req.params.id);
+  if (!apiKey) {
+    return res.status(404).json({ message: 'Clé API non trouvée' });
+  }
+
+  await apiKey.destroy();
+  res.status(204).end();
+}));
+
+router.post('/apikeys/:id/regenerate', asyncHandler(async (req, res) => {
+  const apiKey = await ApiKey.findByPk(req.params.id);
+  if (!apiKey) {
+    return res.status(404).json({ message: 'Clé API non trouvée' });
+  }
+
+  // Générer une nouvelle clé API
+  const key = 'sk_' + crypto.randomBytes(24).toString('hex');
+  apiKey.key = key;
+  await apiKey.save();
+
+  // Transformer les données
+  const transformedApiKey = {
+    id: apiKey.id.toString(),
+    name: apiKey.name,
+    key: apiKey.key, // Renvoyer la clé complète lors de la régénération
+    permissions: apiKey.permissions,
+    active: apiKey.active,
+    expires_at: apiKey.expires_at ? apiKey.expires_at.toISOString() : null,
+    last_used_at: apiKey.last_used_at ? apiKey.last_used_at.toISOString() : null,
+    description: apiKey.description || '',
+    createdAt: apiKey.createdAt.toISOString()
+  };
+
+  res.json(transformedApiKey);
+}));
+
+router.patch('/apikeys/:id/toggle', asyncHandler(async (req, res) => {
+  const apiKey = await ApiKey.findByPk(req.params.id);
+  if (!apiKey) {
+    return res.status(404).json({ message: 'Clé API non trouvée' });
+  }
+
+  apiKey.active = !apiKey.active;
+  await apiKey.save();
+
+  // Transformer les données
+  const transformedApiKey = {
+    id: apiKey.id.toString(),
+    name: apiKey.name,
+    key: apiKey.masked_key, // Utiliser la clé masquée pour la sécurité
+    permissions: apiKey.permissions,
+    active: apiKey.active,
+    expires_at: apiKey.expires_at ? apiKey.expires_at.toISOString() : null,
+    last_used_at: apiKey.last_used_at ? apiKey.last_used_at.toISOString() : null,
+    description: apiKey.description || '',
+    createdAt: apiKey.createdAt.toISOString()
+  };
+
+  res.json(transformedApiKey);
+}));
+
+// Routes pour les règles d'automatisation
+router.get('/automationrules', asyncHandler(async (req, res) => {
+  const rules = await AutomationRule.findAll({
+    order: [['priority', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedRules = rules.map(rule => ({
+    id: rule.id.toString(),
+    name: rule.name,
+    description: rule.description || '',
+    trigger_type: rule.trigger_type,
+    trigger_value: rule.trigger_value,
+    action_type: rule.action_type,
+    action_params: rule.action_params,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    last_run: rule.last_run ? rule.last_run.toISOString() : null,
+    last_status: rule.last_status,
+    success_count: rule.success_count,
+    failure_count: rule.failure_count,
+    createdAt: rule.createdAt.toISOString()
+  }));
+
+  res.json(transformedRules);
+}));
+
+router.get('/automationrules/:id', asyncHandler(async (req, res) => {
+  const rule = await AutomationRule.findByPk(req.params.id);
+
+  if (!rule) {
+    return res.status(404).json({ message: 'Règle d\'automatisation non trouvée' });
+  }
+
+  // Transformer les données
+  const transformedRule = {
+    id: rule.id.toString(),
+    name: rule.name,
+    description: rule.description || '',
+    trigger_type: rule.trigger_type,
+    trigger_value: rule.trigger_value,
+    action_type: rule.action_type,
+    action_params: rule.action_params,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    last_run: rule.last_run ? rule.last_run.toISOString() : null,
+    last_status: rule.last_status,
+    success_count: rule.success_count,
+    failure_count: rule.failure_count,
+    createdAt: rule.createdAt.toISOString()
+  };
+
+  res.json(transformedRule);
+}));
+
+router.post('/automationrules', asyncHandler(async (req, res) => {
+  const {
+    name,
+    description,
+    trigger_type,
+    trigger_value,
+    action_type,
+    action_params,
+    enabled,
+    priority
+  } = req.body;
+
+  // Créer la règle d'automatisation
+  const rule = await AutomationRule.create({
+    name,
+    description,
+    trigger_type: trigger_type || 'cron',
+    trigger_value,
+    action_type,
+    action_params,
+    enabled: enabled !== undefined ? enabled : true,
+    priority: priority || 100
+  });
+
+  // Transformer les données
+  const transformedRule = {
+    id: rule.id.toString(),
+    name: rule.name,
+    description: rule.description || '',
+    trigger_type: rule.trigger_type,
+    trigger_value: rule.trigger_value,
+    action_type: rule.action_type,
+    action_params: rule.action_params,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    last_run: rule.last_run ? rule.last_run.toISOString() : null,
+    last_status: rule.last_status,
+    success_count: rule.success_count,
+    failure_count: rule.failure_count,
+    createdAt: rule.createdAt.toISOString()
+  };
+
+  res.status(201).json(transformedRule);
+}));
+
+router.put('/automationrules/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    description,
+    trigger_type,
+    trigger_value,
+    action_type,
+    action_params,
+    enabled,
+    priority
+  } = req.body;
+
+  const rule = await AutomationRule.findByPk(req.params.id);
+  if (!rule) {
+    return res.status(404).json({ message: 'Règle d\'automatisation non trouvée' });
+  }
+
+  // Mettre à jour les champs
+  if (name) rule.name = name;
+  if (description !== undefined) rule.description = description;
+  if (trigger_type) rule.trigger_type = trigger_type;
+  if (trigger_value) rule.trigger_value = trigger_value;
+  if (action_type) rule.action_type = action_type;
+  if (action_params) rule.action_params = action_params;
+  if (enabled !== undefined) rule.enabled = enabled;
+  if (priority !== undefined) rule.priority = priority;
+
+  await rule.save();
+
+  // Transformer les données
+  const transformedRule = {
+    id: rule.id.toString(),
+    name: rule.name,
+    description: rule.description || '',
+    trigger_type: rule.trigger_type,
+    trigger_value: rule.trigger_value,
+    action_type: rule.action_type,
+    action_params: rule.action_params,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    last_run: rule.last_run ? rule.last_run.toISOString() : null,
+    last_status: rule.last_status,
+    success_count: rule.success_count,
+    failure_count: rule.failure_count,
+    createdAt: rule.createdAt.toISOString()
+  };
+
+  res.json(transformedRule);
+}));
+
+router.delete('/automationrules/:id', asyncHandler(async (req, res) => {
+  const rule = await AutomationRule.findByPk(req.params.id);
+  if (!rule) {
+    return res.status(404).json({ message: 'Règle d\'automatisation non trouvée' });
+  }
+
+  await rule.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/automationrules/:id/toggle', asyncHandler(async (req, res) => {
+  const rule = await AutomationRule.findByPk(req.params.id);
+  if (!rule) {
+    return res.status(404).json({ message: 'Règle d\'automatisation non trouvée' });
+  }
+
+  rule.enabled = !rule.enabled;
+  await rule.save();
+
+  // Transformer les données
+  const transformedRule = {
+    id: rule.id.toString(),
+    name: rule.name,
+    description: rule.description || '',
+    trigger_type: rule.trigger_type,
+    trigger_value: rule.trigger_value,
+    action_type: rule.action_type,
+    action_params: rule.action_params,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    last_run: rule.last_run ? rule.last_run.toISOString() : null,
+    last_status: rule.last_status,
+    success_count: rule.success_count,
+    failure_count: rule.failure_count,
+    createdAt: rule.createdAt.toISOString()
+  };
+
+  res.json(transformedRule);
+}));
+
+router.post('/automationrules/:id/run', asyncHandler(async (req, res) => {
+  const rule = await AutomationRule.findByPk(req.params.id);
+  if (!rule) {
+    return res.status(404).json({ message: 'Règle d\'automatisation non trouvée' });
+  }
+
+  // Simuler l'exécution de la règle (dans une vraie application, cela déclencherait l'action réelle)
+  const success = Math.random() > 0.2; // 80% de chance de succès pour la simulation
+
+  rule.last_run = new Date();
+  rule.last_status = success ? 'success' : 'failure';
+
+  if (success) {
+    rule.success_count += 1;
+  } else {
+    rule.failure_count += 1;
+  }
+
+  await rule.save();
+
+  // Transformer les données
+  const transformedRule = {
+    id: rule.id.toString(),
+    name: rule.name,
+    description: rule.description || '',
+    trigger_type: rule.trigger_type,
+    trigger_value: rule.trigger_value,
+    action_type: rule.action_type,
+    action_params: rule.action_params,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    last_run: rule.last_run ? rule.last_run.toISOString() : null,
+    last_status: rule.last_status,
+    success_count: rule.success_count,
+    failure_count: rule.failure_count,
+    createdAt: rule.createdAt.toISOString()
+  };
+
+  res.json({
+    rule: transformedRule,
+    execution: {
+      success,
+      message: success ? 'Règle exécutée avec succès' : 'Échec de l\'exécution de la règle',
+      timestamp: new Date().toISOString()
+    }
+  });
+}));
+
+// Routes pour les paramètres de journalisation
+router.get('/loggingsettings', asyncHandler(async (req, res) => {
+  const settings = await LoggingSetting.findAll();
+
+  // Transformer les données
+  const transformedSettings = settings.map(setting => {
+    let value = setting.value;
+
+    // Convertir la valeur selon son type
+    if (setting.valueType === 'boolean') {
+      value = value === 'true';
+    } else if (setting.valueType === 'number') {
+      value = Number(value);
+    } else if (setting.valueType === 'json') {
+      try {
+        value = JSON.parse(value);
+      } catch (e) {
+        console.error(`Erreur lors de la conversion JSON pour ${setting.key}:`, e);
+      }
+    }
+
+    return {
+      id: setting.id.toString(),
+      key: setting.key,
+      value: value,
+      description: setting.description || '',
+      valueType: setting.valueType,
+      category: setting.category
+    };
+  });
+
+  res.json(transformedSettings);
+}));
+
+router.get('/loggingsettings/:key', asyncHandler(async (req, res) => {
+  const setting = await LoggingSetting.findOne({
+    where: { key: req.params.key }
+  });
+
+  if (!setting) {
+    return res.status(404).json({ message: 'Paramètre de journalisation non trouvé' });
+  }
+
+  // Convertir la valeur selon son type
+  let value = setting.value;
+  if (setting.valueType === 'boolean') {
+    value = value === 'true';
+  } else if (setting.valueType === 'number') {
+    value = Number(value);
+  } else if (setting.valueType === 'json') {
+    try {
+      value = JSON.parse(value);
+    } catch (e) {
+      console.error(`Erreur lors de la conversion JSON pour ${setting.key}:`, e);
+    }
+  }
+
+  // Transformer les données
+  const transformedSetting = {
+    id: setting.id.toString(),
+    key: setting.key,
+    value: value,
+    description: setting.description || '',
+    valueType: setting.valueType,
+    category: setting.category
+  };
+
+  res.json(transformedSetting);
+}));
+
+router.put('/loggingsettings/:key', asyncHandler(async (req, res) => {
+  const { value } = req.body;
+
+  const setting = await LoggingSetting.findOne({
+    where: { key: req.params.key }
+  });
+
+  if (!setting) {
+    return res.status(404).json({ message: 'Paramètre de journalisation non trouvé' });
+  }
+
+  // Convertir la valeur en chaîne selon son type
+  let stringValue;
+  if (typeof value === 'boolean') {
+    stringValue = value.toString();
+  } else if (typeof value === 'number') {
+    stringValue = value.toString();
+  } else if (typeof value === 'object') {
+    stringValue = JSON.stringify(value);
+  } else {
+    stringValue = value;
+  }
+
+  setting.value = stringValue;
+  await setting.save();
+
+  // Convertir la valeur selon son type pour la réponse
+  let convertedValue = setting.value;
+  if (setting.valueType === 'boolean') {
+    convertedValue = convertedValue === 'true';
+  } else if (setting.valueType === 'number') {
+    convertedValue = Number(convertedValue);
+  } else if (setting.valueType === 'json') {
+    try {
+      convertedValue = JSON.parse(convertedValue);
+    } catch (e) {
+      console.error(`Erreur lors de la conversion JSON pour ${setting.key}:`, e);
+    }
+  }
+
+  // Transformer les données
+  const transformedSetting = {
+    id: setting.id.toString(),
+    key: setting.key,
+    value: convertedValue,
+    description: setting.description || '',
+    valueType: setting.valueType,
+    category: setting.category
+  };
+
+  res.json(transformedSetting);
+}));
+
+router.put('/loggingsettings/batch', asyncHandler(async (req, res) => {
+  const { settings } = req.body;
+
+  const updatedSettings = [];
+
+  for (const settingData of settings) {
+    const setting = await LoggingSetting.findOne({
+      where: { key: settingData.key }
+    });
+
+    if (setting) {
+      // Convertir la valeur en chaîne selon son type
+      let stringValue;
+      if (typeof settingData.value === 'boolean') {
+        stringValue = settingData.value.toString();
+      } else if (typeof settingData.value === 'number') {
+        stringValue = settingData.value.toString();
+      } else if (typeof settingData.value === 'object') {
+        stringValue = JSON.stringify(settingData.value);
+      } else {
+        stringValue = settingData.value;
+      }
+
+      setting.value = stringValue;
+      await setting.save();
+
+      // Convertir la valeur selon son type pour la réponse
+      let convertedValue = setting.value;
+      if (setting.valueType === 'boolean') {
+        convertedValue = convertedValue === 'true';
+      } else if (setting.valueType === 'number') {
+        convertedValue = Number(convertedValue);
+      } else if (setting.valueType === 'json') {
+        try {
+          convertedValue = JSON.parse(convertedValue);
+        } catch (e) {
+          console.error(`Erreur lors de la conversion JSON pour ${setting.key}:`, e);
+        }
+      }
+
+      updatedSettings.push({
+        id: setting.id.toString(),
+        key: setting.key,
+        value: convertedValue,
+        description: setting.description || '',
+        valueType: setting.valueType,
+        category: setting.category
+      });
+    }
+  }
+
+  res.json(updatedSettings);
+}));
+
+// Routes pour les modèles de documents
+router.get('/documentlayouts', asyncHandler(async (req, res) => {
+  const layouts = await DocumentLayout.findAll({
+    order: [['type', 'ASC'], ['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedLayouts = layouts.map(layout => ({
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedLayouts);
+}));
+
+router.get('/documentlayouts/:id', asyncHandler(async (req, res) => {
+  const layout = await DocumentLayout.findByPk(req.params.id);
+
+  if (!layout) {
+    return res.status(404).json({ message: 'Modèle de document non trouvé' });
+  }
+
+  // Transformer les données
+  const transformedLayout = {
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    content: layout.content,
+    metadata: layout.metadata,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    margins: layout.margins,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    createdAt: layout.createdAt.toISOString(),
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedLayout);
+}));
+
+router.post('/documentlayouts', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    content,
+    metadata,
+    isDefault,
+    orientation,
+    paperSize,
+    margins,
+    previewUrl,
+    status
+  } = req.body;
+
+  // Si ce modèle est défini comme modèle par défaut, désactiver les autres modèles par défaut du même type
+  if (isDefault) {
+    await DocumentLayout.update(
+      { isDefault: false },
+      { where: { type, isDefault: true } }
+    );
+  }
+
+  // Créer le modèle de document
+  const layout = await DocumentLayout.create({
+    name,
+    type,
+    content,
+    metadata,
+    isDefault: isDefault !== undefined ? isDefault : false,
+    orientation: orientation || 'portrait',
+    paperSize: paperSize || 'A4',
+    margins: margins || { top: 10, right: 10, bottom: 10, left: 10 },
+    previewUrl,
+    status: status || 'active'
+  });
+
+  // Transformer les données
+  const transformedLayout = {
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.status(201).json(transformedLayout);
+}));
+
+router.put('/documentlayouts/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    content,
+    metadata,
+    isDefault,
+    orientation,
+    paperSize,
+    margins,
+    previewUrl,
+    status
+  } = req.body;
+
+  const layout = await DocumentLayout.findByPk(req.params.id);
+  if (!layout) {
+    return res.status(404).json({ message: 'Modèle de document non trouvé' });
+  }
+
+  // Si ce modèle est défini comme modèle par défaut, désactiver les autres modèles par défaut du même type
+  if (isDefault && !layout.isDefault) {
+    await DocumentLayout.update(
+      { isDefault: false },
+      {
+        where: {
+          type: type || layout.type,
+          isDefault: true,
+          id: { [Op.ne]: layout.id }
+        }
+      }
+    );
+  }
+
+  // Mettre à jour les champs
+  if (name) layout.name = name;
+  if (type) layout.type = type;
+  if (content) layout.content = content;
+  if (metadata) layout.metadata = metadata;
+  if (isDefault !== undefined) layout.isDefault = isDefault;
+  if (orientation) layout.orientation = orientation;
+  if (paperSize) layout.paperSize = paperSize;
+  if (margins) layout.margins = margins;
+  if (previewUrl) layout.previewUrl = previewUrl;
+  if (status) layout.status = status;
+
+  await layout.save();
+
+  // Transformer les données
+  const transformedLayout = {
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedLayout);
+}));
+
+router.delete('/documentlayouts/:id', asyncHandler(async (req, res) => {
+  const layout = await DocumentLayout.findByPk(req.params.id);
+  if (!layout) {
+    return res.status(404).json({ message: 'Modèle de document non trouvé' });
+  }
+
+  // Empêcher la suppression d'un modèle par défaut
+  if (layout.isDefault) {
+    return res.status(400).json({
+      message: 'Impossible de supprimer un modèle par défaut. Veuillez d\'abord définir un autre modèle comme modèle par défaut.'
+    });
+  }
+
+  await layout.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/documentlayouts/:id/setdefault', asyncHandler(async (req, res) => {
+  const layout = await DocumentLayout.findByPk(req.params.id);
+  if (!layout) {
+    return res.status(404).json({ message: 'Modèle de document non trouvé' });
+  }
+
+  // Désactiver les autres modèles par défaut du même type
+  await DocumentLayout.update(
+    { isDefault: false },
+    {
+      where: {
+        type: layout.type,
+        isDefault: true,
+        id: { [Op.ne]: layout.id }
+      }
+    }
+  );
+
+  // Définir ce modèle comme modèle par défaut
+  layout.isDefault = true;
+  await layout.save();
+
+  // Transformer les données
+  const transformedLayout = {
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedLayout);
+}));
+
+router.get('/documentlayouts/type/:type', asyncHandler(async (req, res) => {
+  const layouts = await DocumentLayout.findAll({
+    where: { type: req.params.type },
+    order: [['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedLayouts = layouts.map(layout => ({
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedLayouts);
+}));
+
+router.get('/documentlayouts/type/:type/default', asyncHandler(async (req, res) => {
+  const layout = await DocumentLayout.findOne({
+    where: {
+      type: req.params.type,
+      isDefault: true
+    }
+  });
+
+  if (!layout) {
+    return res.status(404).json({ message: 'Aucun modèle par défaut trouvé pour ce type de document' });
+  }
+
+  // Transformer les données
+  const transformedLayout = {
+    id: layout.id.toString(),
+    name: layout.name,
+    type: layout.type,
+    content: layout.content,
+    metadata: layout.metadata,
+    isDefault: layout.isDefault,
+    orientation: layout.orientation,
+    paperSize: layout.paperSize,
+    margins: layout.margins,
+    previewUrl: layout.previewUrl,
+    status: layout.status,
+    createdAt: layout.createdAt.toISOString(),
+    lastModified: layout.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedLayout);
+}));
+
+// Routes pour les modèles de rapports
+router.get('/reporttemplates', asyncHandler(async (req, res) => {
+  const templates = await ReportTemplate.findAll({
+    order: [['category', 'ASC'], ['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedTemplates = templates.map(template => ({
+    id: template.id.toString(),
+    name: template.name,
+    category: template.category,
+    format: template.format,
+    previewUrl: template.previewUrl,
+    status: template.status,
+    lastModified: template.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedTemplates);
+}));
+
+router.get('/reporttemplates/:id', asyncHandler(async (req, res) => {
+  const template = await ReportTemplate.findByPk(req.params.id);
+
+  if (!template) {
+    return res.status(404).json({ message: 'Modèle de rapport non trouvé' });
+  }
+
+  // Transformer les données
+  const transformedTemplate = {
+    id: template.id.toString(),
+    name: template.name,
+    category: template.category,
+    description: template.description || '',
+    content: template.content,
+    format: template.format,
+    parameters: template.parameters,
+    query: template.query,
+    previewUrl: template.previewUrl,
+    status: template.status,
+    isShared: template.isShared,
+    requiredPermissions: template.requiredPermissions,
+    scheduleFrequency: template.scheduleFrequency,
+    scheduleCron: template.scheduleCron,
+    createdAt: template.createdAt.toISOString(),
+    lastModified: template.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedTemplate);
+}));
+
+router.post('/reporttemplates', asyncHandler(async (req, res) => {
+  const {
+    name,
+    category,
+    description,
+    content,
+    format,
+    parameters,
+    query,
+    previewUrl,
+    status,
+    isShared,
+    requiredPermissions,
+    scheduleFrequency,
+    scheduleCron
+  } = req.body;
+
+  // Créer le modèle de rapport
+  const template = await ReportTemplate.create({
+    name,
+    category,
+    description,
+    content,
+    format: format || 'PDF',
+    parameters,
+    query,
+    previewUrl,
+    status: status || 'active',
+    isShared: isShared !== undefined ? isShared : true,
+    requiredPermissions,
+    scheduleFrequency,
+    scheduleCron
+  });
+
+  // Transformer les données
+  const transformedTemplate = {
+    id: template.id.toString(),
+    name: template.name,
+    category: template.category,
+    format: template.format,
+    previewUrl: template.previewUrl,
+    status: template.status,
+    lastModified: template.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.status(201).json(transformedTemplate);
+}));
+
+router.put('/reporttemplates/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    category,
+    description,
+    content,
+    format,
+    parameters,
+    query,
+    previewUrl,
+    status,
+    isShared,
+    requiredPermissions,
+    scheduleFrequency,
+    scheduleCron
+  } = req.body;
+
+  const template = await ReportTemplate.findByPk(req.params.id);
+  if (!template) {
+    return res.status(404).json({ message: 'Modèle de rapport non trouvé' });
+  }
+
+  // Mettre à jour les champs
+  if (name) template.name = name;
+  if (category) template.category = category;
+  if (description !== undefined) template.description = description;
+  if (content) template.content = content;
+  if (format) template.format = format;
+  if (parameters) template.parameters = parameters;
+  if (query !== undefined) template.query = query;
+  if (previewUrl) template.previewUrl = previewUrl;
+  if (status) template.status = status;
+  if (isShared !== undefined) template.isShared = isShared;
+  if (requiredPermissions) template.requiredPermissions = requiredPermissions;
+  if (scheduleFrequency !== undefined) template.scheduleFrequency = scheduleFrequency;
+  if (scheduleCron !== undefined) template.scheduleCron = scheduleCron;
+
+  await template.save();
+
+  // Transformer les données
+  const transformedTemplate = {
+    id: template.id.toString(),
+    name: template.name,
+    category: template.category,
+    format: template.format,
+    previewUrl: template.previewUrl,
+    status: template.status,
+    lastModified: template.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedTemplate);
+}));
+
+router.delete('/reporttemplates/:id', asyncHandler(async (req, res) => {
+  const template = await ReportTemplate.findByPk(req.params.id);
+  if (!template) {
+    return res.status(404).json({ message: 'Modèle de rapport non trouvé' });
+  }
+
+  await template.destroy();
+  res.status(204).end();
+}));
+
+router.get('/reporttemplates/category/:category', asyncHandler(async (req, res) => {
+  const templates = await ReportTemplate.findAll({
+    where: { category: req.params.category },
+    order: [['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedTemplates = templates.map(template => ({
+    id: template.id.toString(),
+    name: template.name,
+    category: template.category,
+    format: template.format,
+    previewUrl: template.previewUrl,
+    status: template.status,
+    lastModified: template.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedTemplates);
+}));
+
+router.post('/reporttemplates/:id/generate', asyncHandler(async (req, res) => {
+  const { parameters } = req.body;
+
+  const template = await ReportTemplate.findByPk(req.params.id);
+  if (!template) {
+    return res.status(404).json({ message: 'Modèle de rapport non trouvé' });
+  }
+
+  // Simuler la génération d'un rapport (dans une vraie application, cela générerait réellement le rapport)
+  // Ici, nous renvoyons simplement un lien de téléchargement fictif
+
+  const reportUrl = `/reports/generated/${template.id}_${Date.now()}.${template.format.toLowerCase()}`;
+
+  res.json({
+    success: true,
+    message: 'Rapport généré avec succès',
+    reportUrl,
+    format: template.format,
+    generatedAt: new Date().toISOString()
+  });
+}));
+
+// Routes pour les imprimantes
+router.get('/printers', asyncHandler(async (req, res) => {
+  const printers = await Printer.findAll({
+    order: [['name', 'ASC']]
+  });
+
+  // Transformer les données
+  const transformedPrinters = printers.map(printer => ({
+    id: printer.id.toString(),
+    name: printer.name,
+    type: printer.type,
+    connection: printer.connection,
+    address: printer.address,
+    port: printer.port,
+    isDefault: printer.isDefault,
+    status: printer.status,
+    lastModified: printer.updatedAt.toISOString().split('T')[0]
+  }));
+
+  res.json(transformedPrinters);
+}));
+
+router.get('/printers/:id', asyncHandler(async (req, res) => {
+  const printer = await Printer.findByPk(req.params.id);
+
+  if (!printer) {
+    return res.status(404).json({ message: 'Imprimante non trouvée' });
+  }
+
+  // Transformer les données
+  const transformedPrinter = {
+    id: printer.id.toString(),
+    name: printer.name,
+    type: printer.type,
+    connection: printer.connection,
+    address: printer.address,
+    port: printer.port,
+    driver: printer.driver,
+    options: printer.options,
+    isDefault: printer.isDefault,
+    status: printer.status,
+    capabilities: printer.capabilities,
+    createdAt: printer.createdAt.toISOString(),
+    lastModified: printer.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedPrinter);
+}));
+
+router.post('/printers', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    connection,
+    address,
+    port,
+    driver,
+    options,
+    isDefault,
+    status,
+    capabilities
+  } = req.body;
+
+  // Si cette imprimante est définie comme imprimante par défaut, désactiver les autres imprimantes par défaut
+  if (isDefault) {
+    await Printer.update(
+      { isDefault: false },
+      { where: { isDefault: true } }
+    );
+  }
+
+  // Créer l'imprimante
+  const printer = await Printer.create({
+    name,
+    type,
+    connection,
+    address,
+    port,
+    driver,
+    options,
+    isDefault: isDefault !== undefined ? isDefault : false,
+    status: status || 'active',
+    capabilities
+  });
+
+  // Transformer les données
+  const transformedPrinter = {
+    id: printer.id.toString(),
+    name: printer.name,
+    type: printer.type,
+    connection: printer.connection,
+    address: printer.address,
+    port: printer.port,
+    isDefault: printer.isDefault,
+    status: printer.status,
+    lastModified: printer.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.status(201).json(transformedPrinter);
+}));
+
+router.put('/printers/:id', asyncHandler(async (req, res) => {
+  const {
+    name,
+    type,
+    connection,
+    address,
+    port,
+    driver,
+    options,
+    isDefault,
+    status,
+    capabilities
+  } = req.body;
+
+  const printer = await Printer.findByPk(req.params.id);
+  if (!printer) {
+    return res.status(404).json({ message: 'Imprimante non trouvée' });
+  }
+
+  // Si cette imprimante est définie comme imprimante par défaut, désactiver les autres imprimantes par défaut
+  if (isDefault && !printer.isDefault) {
+    await Printer.update(
+      { isDefault: false },
+      {
+        where: {
+          isDefault: true,
+          id: { [Op.ne]: printer.id }
+        }
+      }
+    );
+  }
+
+  // Mettre à jour les champs
+  if (name) printer.name = name;
+  if (type) printer.type = type;
+  if (connection) printer.connection = connection;
+  if (address !== undefined) printer.address = address;
+  if (port !== undefined) printer.port = port;
+  if (driver !== undefined) printer.driver = driver;
+  if (options) printer.options = options;
+  if (isDefault !== undefined) printer.isDefault = isDefault;
+  if (status) printer.status = status;
+  if (capabilities) printer.capabilities = capabilities;
+
+  await printer.save();
+
+  // Transformer les données
+  const transformedPrinter = {
+    id: printer.id.toString(),
+    name: printer.name,
+    type: printer.type,
+    connection: printer.connection,
+    address: printer.address,
+    port: printer.port,
+    isDefault: printer.isDefault,
+    status: printer.status,
+    lastModified: printer.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedPrinter);
+}));
+
+router.delete('/printers/:id', asyncHandler(async (req, res) => {
+  const printer = await Printer.findByPk(req.params.id);
+  if (!printer) {
+    return res.status(404).json({ message: 'Imprimante non trouvée' });
+  }
+
+  // Empêcher la suppression d'une imprimante par défaut
+  if (printer.isDefault) {
+    return res.status(400).json({
+      message: 'Impossible de supprimer l\'imprimante par défaut. Veuillez d\'abord définir une autre imprimante comme imprimante par défaut.'
+    });
+  }
+
+  await printer.destroy();
+  res.status(204).end();
+}));
+
+router.patch('/printers/:id/setdefault', asyncHandler(async (req, res) => {
+  const printer = await Printer.findByPk(req.params.id);
+  if (!printer) {
+    return res.status(404).json({ message: 'Imprimante non trouvée' });
+  }
+
+  // Désactiver les autres imprimantes par défaut
+  await Printer.update(
+    { isDefault: false },
+    {
+      where: {
+        isDefault: true,
+        id: { [Op.ne]: printer.id }
+      }
+    }
+  );
+
+  // Définir cette imprimante comme imprimante par défaut
+  printer.isDefault = true;
+  await printer.save();
+
+  // Transformer les données
+  const transformedPrinter = {
+    id: printer.id.toString(),
+    name: printer.name,
+    type: printer.type,
+    connection: printer.connection,
+    address: printer.address,
+    port: printer.port,
+    isDefault: printer.isDefault,
+    status: printer.status,
+    lastModified: printer.updatedAt.toISOString().split('T')[0]
+  };
+
+  res.json(transformedPrinter);
+}));
+
+router.post('/printers/:id/test', asyncHandler(async (req, res) => {
+  const printer = await Printer.findByPk(req.params.id);
+  if (!printer) {
+    return res.status(404).json({ message: 'Imprimante non trouvée' });
+  }
+
+  // Simuler un test d'impression (dans une vraie application, cela enverrait réellement une page de test à l'imprimante)
+  // Ici, nous renvoyons simplement un résultat de test fictif
+
+  const testResult = {
+    success: true,
+    message: 'Test d\'impression réussi',
+    printer: printer.name,
+    timestamp: new Date().toISOString()
+  };
+
+  res.json(testResult);
 }));
 
 module.exports = router;
