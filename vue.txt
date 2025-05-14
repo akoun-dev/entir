@@ -1,7 +1,0 @@
-Je remarque une truc, au niveau de tables, je vois que il y a des tables qui se repetent. dans tables countries, on a un champs Devise, 
-qui est fixe pourtant, il existe une tables currencies, qui contient toutes les devises, 
-donc la table countries doit contenir un champs currency_id, qui est un id de la table currencies, 
-et non pas un champs currency qui contient la devise en elle meme. c'est juste exemple.
-
-un autre cas, si j'ai besoin des Users, je sais que nous avons une tables qui s'appelle users. Vu qu'il s'agit d'une ERP
-comment je peux les reutiliser dans mes modules et aussi les utiliser dans les formulaire qui faut
