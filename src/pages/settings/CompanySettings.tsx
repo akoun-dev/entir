@@ -41,6 +41,24 @@ const CompanySettings: React.FC = () => {
   useEffect(() => {
     const fetchCompanyParams = async () => {
       try {
+        // Vérifier l'existence des paramètres requis
+        const requiredParams = [
+          'company_trading_name',
+          'company_description',
+          'company_industry',
+          'company_foundation_date'
+        ];
+        
+        // Vérifier chaque paramètre manquant
+        for (const key of requiredParams) {
+          try {
+            await parameterService.getByKey(key);
+          } catch (error) {
+            console.log(`Paramètre ${key} non trouvé, création...`);
+            await parameterService.update(key, '');
+          }
+        }
+
         const params = await parameterService.getByCategory('company');
 
         // Mettre à jour l'état avec les paramètres récupérés
@@ -84,15 +102,18 @@ const CompanySettings: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
 
-    try {
-      // Préparer les paramètres à mettre à jour
-      const paramsToUpdate = Object.entries(companyParams).map(([key, value]) => ({
-        key,
-        value: value || ''
-      }));
+      try {
+        // Préparer les paramètres à mettre à jour
+        const paramsToUpdate = Object.entries(companyParams).map(([key, value]) => ({
+          key,
+          value: value || ''
+        }));
 
-      // Mettre à jour les paramètres
-      await parameterService.updateBatch(paramsToUpdate);
+        console.log('Params to update:', paramsToUpdate); // Debug
+        
+        // Mettre à jour les paramètres
+        const result = await parameterService.updateBatch(paramsToUpdate);
+        console.log('Update result:', result); // Debug
 
       toast({
         title: 'Succès',
