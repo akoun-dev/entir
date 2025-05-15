@@ -1,0 +1,15 @@
+Fonctionnalités implémentées
+Le composant de chatter permet :
+
+Affichage des messages liés à un enregistrement spécifique
+Envoi de nouveaux messages
+Affichage de l'historique des modifications (logs système)
+Possibilité d'ajouter des pièces jointes (interface prête, mais fonctionnalité simulée)
+Intégration facile dans n'importe quelle vue grâce au hook useChatter
+Prochaines étapes possibles
+Implémenter le backend réel avec Express et Sequelize
+Ajouter la fonctionnalité de mentions d'utilisateurs
+Améliorer l'interface utilisateur avec des animations
+Ajouter des tests unitaires et d'intégration
+Implémenter la pagination pour les messages
+Vous pouvez maintenant tester l'implémentation en lançant l'application et en naviguant vers la page d'exemple (/example).

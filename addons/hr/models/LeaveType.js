@@ -2,7 +2,7 @@
 
 /**
  * Modèle LeaveType (Type de congé)
- * 
+ *
  * Représente un type de congé disponible dans l'entreprise
  */
 module.exports = (sequelize, DataTypes) => {
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
-    
+
     // Informations du type de congé
     name: {
       type: DataTypes.STRING,
@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       comment: 'Description du type de congé'
     },
-    
+
     // Configuration
     color: {
       type: DataTypes.STRING,
@@ -40,32 +40,52 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       comment: 'Icône associée à ce type de congé'
     },
-    
+
     // Allocation
     allowance: {
       type: DataTypes.DECIMAL(5, 2),
       comment: 'Nombre de jours alloués par an (null = illimité)'
     },
-    
+    limit_days: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.allowance;
+      },
+      set(value) {
+        this.setDataValue('allowance', value);
+      },
+      comment: 'Alias pour allowance (virtuel)'
+    },
+
     // Paramètres
     requiresApproval: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'Indique si ce type de congé nécessite une approbation'
     },
+    requires_approval: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.requiresApproval;
+      },
+      set(value) {
+        this.setDataValue('requiresApproval', value);
+      },
+      comment: 'Alias pour requiresApproval (virtuel)'
+    },
     isPaid: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'Indique si ce type de congé est payé'
     },
-    
+
     // Statut
     active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'Indique si ce type de congé est actif'
     },
-    
+
     // Champs système
     createdBy: {
       type: DataTypes.INTEGER,

@@ -1,1 +1,37 @@
-0
+Un composant de chatter modulaire et réutilisable, qui permet :
+
+💬 Ajout de messages (texte ou système)
+
+📎 Ajout de pièces jointes
+
+👤 Mentions d’utilisateurs
+
+📜 Historique de suivi (log system + utilisateur)
+
+🔗 Liaison à n’importe quel enregistrement (modèle + id)
+
+🏗️ Architecture proposée
+🔁 Backend (Express + Sequelize)
+Un modèle Message générique lié à n'importe quel modèle via :
+
+ts
+Copier
+Modifier
+model_name: string  
+model_id: number
+Optionnel : un modèle Attachment lié aux messages
+
+API REST : GET /chatter/:model/:id, POST /chatter/:model/:id
+
+🧠 Frontend (React)
+Un composant Chatter :
+
+Liste des messages
+
+Input d’envoi
+
+Dropzone de fichier
+
+Mention system
+
+Rechargement via TanStack Query

@@ -6,9 +6,11 @@ import MainLayout from "./components/layouts/MainLayout";
 import { ThemeProvider } from "./components/providers/theme-provider";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ExamplePage from "./pages/ExamplePage";
 import AddonLoader from "./components/AddonLoader";
 import AddonManager from "./core/AddonManager";
 import SettingsRoutes from "./routes/SettingsRoutes";
+import ChatterProvider from "./contexts/ChatterContext";
 
 // Création du client de requête
 const queryClient = new QueryClient();
@@ -17,9 +19,11 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light">
-        <AddonLoader>
-          <AppRoutes />
-        </AddonLoader>
+        <ChatterProvider>
+          <AddonLoader>
+            <AppRoutes />
+          </AddonLoader>
+        </ChatterProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
@@ -56,6 +60,9 @@ const AppRoutes = () => {
         <Route element={<MainLayout />}>
           {/* Route principale */}
           <Route path="/" element={<Index />} />
+
+          {/* Route d'exemple avec chatter */}
+          <Route path="/example" element={<ExamplePage />} />
 
           {/* Routes des addons */}
           {addonRoutes.map((route, index) => {
