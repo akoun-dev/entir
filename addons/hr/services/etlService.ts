@@ -1,97 +1,78 @@
-
-import { toast } from 'sonner';
-import ApiService from './apiService';
-
-/**
- * Interface for import mapping
- */
-export interface ImportMapping {
-  sourceField: string;
-  targetField: string;
-}
+import { ImportMapping, ImportConfig, ImportResult } from '../hooks/useETLImport';
+import { employeeService } from './index';
 
 /**
- * Interface for import configuration
+ * Service pour la gestion des opérations ETL (Extract, Transform, Load)
+ * 
+ * Ce service fournit des fonctionnalités pour importer des données à partir de fichiers
+ * CSV, Excel, etc. dans le système.
  */
-export interface ImportConfig {
-  createMissing: boolean;
-  updateExisting: boolean;
-  identifierField: string;
-}
-
-/**
- * Interface for import result
- */
-export interface ImportResult {
-  success: boolean;
-  total?: number;
-  created?: number;
-  updated?: number;
-  skipped?: number;
-  failed?: number;
-  errors?: Array<{
-    row?: number;
-    field?: string;
-    value?: string;
-    message: string;
-  }>;
-}
-
-/**
- * Service pour l'extraction, la transformation et le chargement (ETL) de données.
- * Gère l'importation de données à partir de fichiers CSV et Excel, leur transformation
- * et leur chargement dans l'application.
- */
-export class ETLService {
-  private static instance: ETLService;
-  private isImporting: boolean = false;
-  private cancelImportFlag: boolean = false;
-
-  // Singleton
-  private constructor() {}
-
-  public static getInstance(): ETLService {
-    if (!ETLService.instance) {
-      ETLService.instance = new ETLService();
-    }
-    return ETLService.instance;
-  }
-
+class ETLService {
+  private abortController: AbortController | null = null;
+  
   /**
-   * Parse un fichier (CSV ou Excel) et extrait les données.
-   * @param file Le fichier à parser.
-   * @returns Une promesse résolue avec les en-têtes et les données parsées.
+   * Parse un fichier CSV ou Excel
+   * @param file Fichier à parser
+   * @returns Données parsées (en-têtes et lignes)
    */
-  public async parseFile(file: File): Promise<{ headers: string[]; data: any[] }> {
+  async parseFile(file: File): Promise<{ headers: string[], data: any[] }> {
+    return new Promise((resolve, reject) => {
+      // Vérifier le type de fichier
+      if (file.name.endsWith('.csv')) {
+        this.parseCSV(file)
+          .then(resolve)
+          .catch(reject);
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        this.parseExcel(file)
+          .then(resolve)
+          .catch(reject);
+      } else {
+        reject(new Error('Format de fichier non pris en charge. Veuillez utiliser un fichier CSV ou Excel.'));
+      }
+    });
+  }
+  
+  /**
+   * Parse un fichier CSV
+   * @param file Fichier CSV
+   * @returns Données parsées (en-têtes et lignes)
+   */
+  private async parseCSV(file: File): Promise<{ headers: string[], data: any[] }> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-
-      reader.onload = (e: any) => {
+      
+      reader.onload = (event) => {
         try {
-          // For simplicity, let's parse CSV manually since we don't have xlsx library
-          const text = e.target.result;
-          const lines = text.split('\n');
-          
-          if (lines.length === 0) {
-            reject(new Error('Le fichier est vide'));
-            return;
+          if (!event.target || !event.target.result) {
+            throw new Error('Erreur lors de la lecture du fichier');
           }
           
-          const headers = lines[0].split(',').map((header: string) => header.trim());
+          const csv = event.target.result as string;
+          const lines = csv.split('\n');
+          
+          if (lines.length === 0) {
+            throw new Error('Le fichier est vide');
+          }
+          
+          // Extraire les en-têtes
+          const headers = lines[0].split(',').map(header => header.trim());
+          
+          // Extraire les données
           const data = [];
           
           for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
-            if (line) {
-              const values = this.parseCSVLine(line);
-              const row: any = {};
-              
-              headers.forEach((header, index) => {
-                row[header] = values[index] || '';
-              });
-              
-              data.push(row);
-            }
+            
+            if (!line) continue;
+            
+            const values = line.split(',');
+            const row: Record<string, string> = {};
+            
+            headers.forEach((header, index) => {
+              row[header] = values[index] ? values[index].trim() : '';
+            });
+            
+            data.push(row);
           }
           
           resolve({ headers, data });
@@ -99,161 +80,198 @@ export class ETLService {
           reject(error);
         }
       };
-
+      
       reader.onerror = () => {
         reject(new Error('Erreur lors de la lecture du fichier'));
       };
-
+      
       reader.readAsText(file);
     });
   }
   
   /**
-   * Helper to parse CSV lines properly (handling quoted values with commas)
+   * Parse un fichier Excel
+   * @param file Fichier Excel
+   * @returns Données parsées (en-têtes et lignes)
    */
-  private parseCSVLine(line: string): string[] {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
+  private async parseExcel(file: File): Promise<{ headers: string[], data: any[] }> {
+    // Simuler le parsing d'un fichier Excel
+    // Dans une implémentation réelle, il faudrait utiliser une bibliothèque comme xlsx
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
       
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current);
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    
-    result.push(current);
-    return result;
+      reader.onload = () => {
+        try {
+          // Simuler des données Excel
+          const headers = ['Nom', 'Email', 'Téléphone', 'Poste', 'Département', 'Responsable'];
+          const data = [
+            {
+              'Nom': 'Jean Dupont',
+              'Email': 'jean.dupont@example.com',
+              'Téléphone': '+33123456789',
+              'Poste': 'Développeur',
+              'Département': 'Technique',
+              'Responsable': 'Marie Martin'
+            },
+            {
+              'Nom': 'Sophie Lefebvre',
+              'Email': 'sophie.lefebvre@example.com',
+              'Téléphone': '+33987654321',
+              'Poste': 'Designer',
+              'Département': 'Marketing',
+              'Responsable': 'Pierre Dubois'
+            }
+          ];
+          
+          resolve({ headers, data });
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Erreur lors de la lecture du fichier Excel'));
+      };
+      
+      reader.readAsArrayBuffer(file);
+    });
   }
-
+  
   /**
-   * Importe des employés à partir de données parsées.
-   * @param data Les données parsées à importer.
-   * @param mappings Le mapping des champs source vers les champs cible.
-   * @param config La configuration de l'import.
-   * @param progressCallback Une fonction de callback pour suivre la progression de l'import.
-   * @returns Une promesse résolue avec les résultats de l'import.
+   * Importe des employés à partir de données parsées
+   * @param data Données à importer
+   * @param mappings Configuration de mappage
+   * @param config Configuration d'importation
+   * @param progressCallback Fonction de callback pour le suivi de la progression
+   * @returns Résultat de l'importation
    */
-  public async importEmployees(
+  async importEmployees(
     data: any[],
     mappings: ImportMapping[],
     config: ImportConfig,
     progressCallback?: (progress: number) => void
   ): Promise<ImportResult> {
-    if (this.isImporting) {
-      throw new Error('Un import est déjà en cours');
-    }
-
-    this.isImporting = true;
-    this.cancelImportFlag = false;
-
-    let created = 0;
-    let updated = 0;
-    let skipped = 0;
-    let failed = 0;
-    const errors: ImportResult['errors'] = [];
-    const total = data.length;
-
-    try {
-      for (let index = 0; index < total; index++) {
-        if (this.cancelImportFlag) {
-          break;
-        }
-
-        const row = data[index];
-        const employeeData: Record<string, any> = {};
-
-        // Mapper les champs source vers les champs cible
-        mappings.forEach(mapping => {
-          if (mapping.targetField && row[mapping.sourceField] !== undefined) {
-            employeeData[mapping.targetField] = row[mapping.sourceField];
-          }
-        });
-
-        try {
-          // Importer l'employé via l'API
-          const api = ApiService;
-          
-          if (!api.isServiceInitialized()) {
-            throw new Error('API Service not initialized');
-          }
-
-          // Simuler l'import en mode démonstration
-          const isApiMode = await api.get('/organization/ping')
-            .then(() => true)
-            .catch(() => false);
-
-          if (!isApiMode) {
-            console.warn('Import en mode démonstration');
-            skipped++;
-          } else {
-            // Envoyer les données à l'API pour créer ou mettre à jour l'employé
-            const response = await api.post('/organization/employees', employeeData);
-
-            if (response) {
-              created++;
-            } else {
-              updated++;
-            }
-          }
-        } catch (error: any) {
-          console.error('Erreur lors de l\'import de la ligne', index + 1, error);
-          failed++;
-          errors.push({
-            row: index + 1,
-            message: error.message || 'Erreur inconnue'
-          });
-        }
-
-        // Calculer la progression et déclencher le callback
-        const progress = Math.round(((index + 1) / total) * 100);
-        progressCallback?.(progress);
-      }
-    } finally {
-      this.isImporting = false;
-    }
-
-    return {
-      success: failed === 0,
-      total,
-      created,
-      updated,
-      skipped,
-      failed,
-      errors
+    // Créer un nouvel AbortController pour permettre l'annulation
+    this.abortController = new AbortController();
+    
+    const result: ImportResult = {
+      success: true,
+      total: data.length,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      errors: []
     };
+    
+    // Transformer les données selon le mappage
+    const transformedData = data.map(row => {
+      const transformedRow: Record<string, any> = {};
+      
+      mappings.forEach(mapping => {
+        if (mapping.targetField && mapping.sourceField) {
+          transformedRow[mapping.targetField] = row[mapping.sourceField];
+        }
+      });
+      
+      return transformedRow;
+    });
+    
+    // Traiter chaque ligne
+    for (let i = 0; i < transformedData.length; i++) {
+      // Vérifier si l'importation a été annulée
+      if (this.abortController.signal.aborted) {
+        result.success = false;
+        break;
+      }
+      
+      const row = transformedData[i];
+      
+      try {
+        // Vérifier si l'employé existe déjà
+        let existingEmployee = null;
+        
+        if (config.updateExisting && row[config.identifierField]) {
+          try {
+            // Simuler la recherche d'un employé existant
+            // Dans une implémentation réelle, il faudrait utiliser un service pour rechercher l'employé
+            if (config.identifierField === 'email') {
+              const employees = await employeeService.getAll();
+              existingEmployee = employees.find(emp => emp.work_email === row[config.identifierField]);
+            }
+          } catch (error) {
+            console.error('Erreur lors de la recherche de l\'employé existant:', error);
+          }
+        }
+        
+        if (existingEmployee) {
+          // Mettre à jour l'employé existant
+          if (config.updateExisting) {
+            await employeeService.updateEmployee(existingEmployee.id, row);
+            result.updated++;
+          } else {
+            result.skipped++;
+          }
+        } else {
+          // Créer un nouvel employé
+          if (config.createMissing) {
+            await employeeService.createEmployee(row);
+            result.created++;
+          } else {
+            result.skipped++;
+          }
+        }
+      } catch (error) {
+        result.failed++;
+        result.errors?.push({
+          row: i + 1,
+          message: error instanceof Error ? error.message : 'Erreur inconnue'
+        });
+      }
+      
+      // Mettre à jour la progression
+      if (progressCallback) {
+        progressCallback(Math.round(((i + 1) / transformedData.length) * 100));
+      }
+    }
+    
+    // Mettre à jour le statut de succès
+    result.success = result.failed === 0;
+    
+    return result;
   }
-
+  
   /**
-   * Annule l'import en cours.
+   * Annule l'importation en cours
    */
-  public cancelImport(): void {
-    this.cancelImportFlag = true;
+  cancelImport(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
   }
-
+  
   /**
-   * Génère un rapport d'erreurs au format CSV.
-   * @param importResults Les résultats de l'import.
-   * @returns Un Blob contenant le rapport d'erreurs au format CSV.
+   * Génère un rapport d'erreurs
+   * @param importResults Résultats de l'importation
+   * @returns Blob contenant le rapport d'erreurs
    */
-  public generateErrorReport(importResults: ImportResult): Blob {
-    const headers = ['Ligne', 'Message'];
-    const rows = importResults.errors?.map(error => [error.row, error.message]) || [];
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    return new Blob([csvContent], { type: 'text/csv' });
+  generateErrorReport(importResults: ImportResult): Blob {
+    const headers = 'Ligne,Champ,Valeur,Message\n';
+    
+    const rows = importResults.errors?.map(error => {
+      const row = error.row || '';
+      const field = error.field || '';
+      const value = error.value || '';
+      const message = error.message || '';
+      
+      return `${row},${field},${value},"${message}"`;
+    }).join('\n') || '';
+    
+    const csv = headers + rows;
+    
+    return new Blob([csv], { type: 'text/csv' });
   }
 }
 
-// Export de l'instance par défaut
-export default ETLService.getInstance();
+export default new ETLService();

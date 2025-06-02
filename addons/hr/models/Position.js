@@ -2,7 +2,7 @@
 
 /**
  * Modèle Position (Poste)
- * 
+ *
  * Représente un poste ou une fonction dans l'entreprise
  */
 module.exports = (sequelize, DataTypes) => {
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
-    
+
     // Informations du poste
     name: {
       type: DataTypes.STRING,
@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       comment: 'Description du poste'
     },
-    
+
     // Niveau hiérarchique et classification
     level: {
       type: DataTypes.INTEGER,
@@ -40,7 +40,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       comment: 'Catégorie du poste (ex: technique, administratif, management)'
     },
-    
+
     // Informations salariales
     minSalary: {
       type: DataTypes.DECIMAL(15, 2),
@@ -50,14 +50,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(15, 2),
       comment: 'Salaire maximum pour ce poste'
     },
-    
+
     // Statut
     active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'Indique si le poste est actif'
     },
-    
+
     // Champs système
     createdBy: {
       type: DataTypes.INTEGER,
@@ -99,11 +99,11 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'departmentId',
       as: 'department'
     });
-    
+
     // Un poste peut avoir plusieurs employés
     Position.hasMany(models.Employee, {
       foreignKey: 'positionId',
-      as: 'employees'
+      as: 'positionEmployees'
     });
   };
 

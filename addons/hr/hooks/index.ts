@@ -5,8 +5,13 @@ import { useOrganizationView } from './useOrganizationView';
 import { useETLImport } from './useETLImport';
 import { useRecruitment } from './useRecruitment';
 import { useDepartmentForm } from './useDepartmentForm';
+import { useDepartmentDetail } from './useDepartmentDetail';
 import { useEmployee } from './useEmployee';
 import { useEmployeeForm } from './useEmployeeForm';
+import { useEmployeeView } from './useEmployeeView';
+import { useEmployees } from './useEmployees';
+import { useTraining } from './useTraining';
+import { useLeaves } from './useLeaves';
 
 export {
   useOrgChart,
@@ -16,6 +21,11 @@ export {
   useETLImport,
   useRecruitment,
   useDepartmentForm,
+  useDepartmentDetail,
   useEmployee,
-  useEmployeeForm
+  useEmployeeForm,
+  useEmployeeView,
+  useEmployees,
+  useTraining,
+  useLeaves
 };

@@ -1,16 +1,15 @@
 
 import React from 'react';
-import { HrLayout } from '../../components';
+import { HrLayout, HrSubNavigation, HrBreadcrumb } from '../../components';
 import { useTraining } from '../../../hooks/useTraining';
 import { useEmployee } from '../../../hooks/useEmployee';
 import { toast } from '../../../../../src/hooks/use-toast';
 import { TrainingHeader, SessionTabContent } from '../../../components/training/views';
-import { TrainingNavBar } from '../../../components/training/views';
-import { TrainingStats } from '../../../components/training';
+import { TrainingStats, getTrainingSubNavItems } from '../../../components/training';
 
 const SessionsView: React.FC = () => {
   // Get data from hooks
-  const { 
+  const {
     courses,
     sessions,
     categories,
@@ -19,7 +18,7 @@ const SessionsView: React.FC = () => {
     createEnrollment,
     getTrainingStats
   } = useTraining();
-  
+
   const { employees } = useEmployee();
   const currentEmployee = employees.length > 0 ? employees[0] : null;
   const stats = getTrainingStats();
@@ -39,21 +38,32 @@ const SessionsView: React.FC = () => {
       employee_id: currentEmployee.id.toString(),
       session_id: sessionId
     });
-    
+
     toast({
       title: "Demande d'inscription envoyée",
       description: "Votre demande d'inscription a été enregistrée et est en attente d'approbation."
     });
   };
 
+  // Utilisation des éléments de sous-navigation standardisés
+  const subNavItems = getTrainingSubNavItems();
+
   return (
     <HrLayout>
       <div>
+        {/* Fil d'Ariane */}
+        <HrBreadcrumb
+          items={[
+            { label: 'Formation', path: '/hr/training' },
+            { label: 'Sessions à venir' }
+          ]}
+        />
+
         {/* En-tête avec fil d'Ariane */}
         <TrainingHeader />
 
-        {/* Navigation */}
-        <TrainingNavBar />
+        {/* Navigation standardisée */}
+        <HrSubNavigation items={subNavItems} />
 
         {/* Statistiques */}
         <TrainingStats stats={stats} categories={categories} />

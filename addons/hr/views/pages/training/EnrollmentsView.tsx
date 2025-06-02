@@ -1,15 +1,14 @@
 
 import React, { useCallback } from 'react';
-import { HrLayout } from '../../components';
+import { HrLayout, HrSubNavigation, HrBreadcrumb } from '../../components';
 import { useTraining } from '../../../hooks/useTraining';
 import { useEmployee } from '../../../hooks/useEmployee';
 import { TrainingHeader } from '../../../components/training/views';
-import { TrainingNavBar } from '../../../components/training/views';
-import { TrainingStats, EnrollmentList } from '../../../components/training';
+import { TrainingStats, EnrollmentList, getTrainingSubNavItems } from '../../../components/training';
 
 const EnrollmentsView: React.FC = () => {
   // Get data from hooks
-  const { 
+  const {
     courses,
     sessions,
     enrollments,
@@ -18,7 +17,7 @@ const EnrollmentsView: React.FC = () => {
     rejectEnrollment,
     getTrainingStats
   } = useTraining();
-  
+
   const { employees } = useEmployee();
   const currentEmployee = employees.length > 0 ? employees[0] : null;
   const stats = getTrainingStats();
@@ -34,24 +33,35 @@ const EnrollmentsView: React.FC = () => {
 
   const handleApproveEnrollment = useCallback((enrollmentId: string) => {
     if (!currentEmployee) return;
-    
+
     approveEnrollment(enrollmentId, currentEmployee.id.toString());
   }, [approveEnrollment, currentEmployee]);
 
   const handleRejectEnrollment = useCallback((enrollmentId: string) => {
     if (!currentEmployee) return;
-    
+
     rejectEnrollment(enrollmentId, currentEmployee.id.toString());
   }, [rejectEnrollment, currentEmployee]);
+
+  // Utilisation des éléments de sous-navigation standardisés
+  const subNavItems = getTrainingSubNavItems();
 
   return (
     <HrLayout>
       <div>
+        {/* Fil d'Ariane */}
+        <HrBreadcrumb
+          items={[
+            { label: 'Formation', path: '/hr/training' },
+            { label: 'Inscriptions' }
+          ]}
+        />
+
         {/* En-tête avec fil d'Ariane */}
         <TrainingHeader />
 
-        {/* Navigation */}
-        <TrainingNavBar />
+        {/* Navigation standardisée */}
+        <HrSubNavigation items={subNavItems} />
 
         {/* Statistiques */}
         <TrainingStats stats={stats} categories={categories} />

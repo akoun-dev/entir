@@ -196,7 +196,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Alias pour hireDate (virtuel)'
     },
-    position: {
+    org_chart_position: {
       type: DataTypes.STRING,
       comment: 'Position dans l\'organigramme'
     },
@@ -292,8 +292,22 @@ module.exports = (sequelize, DataTypes) => {
     // Un employé occupe un poste
     Employee.belongsTo(models.Position, {
       foreignKey: 'positionId',
-      as: 'position'
+      as: 'employeePosition'
     });
+
+    // Définir un getter pour job_title à partir de l'association employeePosition
+    Employee.prototype.getJobTitle = async function() {
+      if (this.employeePosition) {
+        return this.employeePosition.name;
+      }
+
+      if (this.positionId) {
+        const position = await models.Position.findByPk(this.positionId);
+        return position ? position.name : null;
+      }
+
+      return this.job_title || null;
+    };
 
     // Un employé peut avoir plusieurs contrats
     Employee.hasMany(models.Contract, {

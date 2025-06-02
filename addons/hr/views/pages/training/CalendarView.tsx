@@ -1,14 +1,13 @@
 
 import React from 'react';
-import { HrLayout } from '../../components';
+import { HrLayout, HrSubNavigation, HrBreadcrumb } from '../../components';
 import { useTraining } from '../../../hooks/useTraining';
 import { TrainingHeader } from '../../../components/training/views';
-import { TrainingNavBar } from '../../../components/training/views';
-import { TrainingStats, TrainingCalendar } from '../../../components/training';
+import { TrainingStats, TrainingCalendar, getTrainingSubNavItems } from '../../../components/training';
 
 const CalendarView: React.FC = () => {
   // Get data from hooks
-  const { 
+  const {
     courses,
     sessions,
     categories,
@@ -17,22 +16,33 @@ const CalendarView: React.FC = () => {
 
   const stats = getTrainingStats();
 
+  // Utilisation des éléments de sous-navigation standardisés
+  const subNavItems = getTrainingSubNavItems();
+
   return (
     <HrLayout>
       <div>
+        {/* Fil d'Ariane */}
+        <HrBreadcrumb
+          items={[
+            { label: 'Formation', path: '/hr/training' },
+            { label: 'Calendrier' }
+          ]}
+        />
+
         {/* En-tête avec fil d'Ariane */}
         <TrainingHeader />
 
-        {/* Navigation */}
-        <TrainingNavBar />
+        {/* Navigation standardisée */}
+        <HrSubNavigation items={subNavItems} />
 
         {/* Statistiques */}
         <TrainingStats stats={stats} categories={categories} />
 
         {/* Calendar content */}
-        <TrainingCalendar 
-          sessions={sessions} 
-          courses={courses} 
+        <TrainingCalendar
+          sessions={sessions}
+          courses={courses}
         />
       </div>
     </HrLayout>

@@ -1,108 +1,129 @@
+import { useState, useEffect, useCallback } from 'react';
+import { OrgChartConfiguration } from '../types/organization';
 
-import { useState, useEffect } from 'react';
-
-export interface OrgChartConfig {
-  // Display options
-  showEmail: boolean;
-  showPhone: boolean;
-  showDepartment: boolean;
-  showPosition: boolean;
-  maxDepth: number;
-  displayMode: 'hierarchical' | 'flat' | 'department';
-  // Appearance options
-  colorByDepartment: boolean;
-  defaultNodeColor: string;
-  nodeWidth: number;
-  nodeHeight: number;
-  departmentColors: Record<string, string>;
-  // Drag and drop options
-  allowDragDrop?: boolean;
-  restrictDragToSameLevel?: boolean;
-  confirmOnDrop?: boolean;
-  animateDragDrop?: boolean;
-}
-
-const defaultConfig: OrgChartConfig = {
-  showEmail: true,
-  showPhone: true,
-  showDepartment: true,
-  showPosition: true,
-  maxDepth: 4,
-  displayMode: 'hierarchical',
-  colorByDepartment: true,
-  defaultNodeColor: '#f3f4f6', // gray-100
-  nodeWidth: 240, // Increased for better readability
-  nodeHeight: 16,
-  departmentColors: {
-    'Direction Générale': '#dbeafe', // blue-100
-    'Ressources Humaines': '#dcfce7', // green-100
-    'Finance': '#fef9c3', // yellow-100
-    'Technique': '#f3e8ff', // purple-100
-    'Marketing': '#ffedd5', // orange-100
-    'Ventes': '#fee2e2', // red-100
-  },
-  // Default drag and drop options
-  allowDragDrop: true,
-  restrictDragToSameLevel: false,
-  confirmOnDrop: true,
-  animateDragDrop: true
-};
-
+/**
+ * Hook pour gérer la configuration de l'organigramme
+ * 
+ * Ce hook permet de charger, modifier et sauvegarder la configuration
+ * de l'organigramme (couleurs, affichage des informations, etc.)
+ */
 export const useOrgChartConfig = () => {
-  const [config, setConfig] = useState<OrgChartConfig>(defaultConfig);
-  const [loaded, setLoaded] = useState(false);
+  // Configuration par défaut de l'organigramme
+  const defaultConfig: OrgChartConfiguration = {
+    showEmail: true,
+    showPhone: true,
+    showDepartment: true,
+    showPosition: true,
+    colorByDepartment: true,
+    departmentColors: {
+      'Direction Générale': '#4F46E5', // Indigo
+      'Ressources Humaines': '#10B981', // Emerald
+      'Finance': '#F59E0B', // Amber
+      'Technique': '#3B82F6', // Blue
+      'Marketing': '#EC4899', // Pink
+      'Ventes': '#8B5CF6', // Purple
+      'Production': '#EF4444', // Red
+      'Logistique': '#F97316', // Orange
+      'Juridique': '#6366F1', // Indigo
+      'Recherche et Développement': '#14B8A6', // Teal
+    },
+    defaultNodeColor: '#64748B', // Slate
+    nodeWidth: 220,
+    nodeHeight: 120,
+    maxDepth: 5,
+    displayMode: 'hierarchical',
+    allowDragDrop: true,
+    restrictDragToSameLevel: false,
+    confirmOnDrop: true,
+    animateDragDrop: true
+  };
 
-  // Load configuration from localStorage on component mount
-  useEffect(() => {
+  // État pour stocker la configuration
+  const [config, setConfig] = useState<OrgChartConfiguration>(defaultConfig);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Clé pour le stockage local
+  const CONFIG_STORAGE_KEY = 'orgChartConfig';
+
+  // Charger la configuration depuis le stockage local
+  const loadConfig = useCallback(() => {
     try {
-      const savedConfig = localStorage.getItem('orgChartConfig');
-      if (savedConfig) {
-        const parsedConfig = JSON.parse(savedConfig);
-        // Ensure all departmentColors are valid hex codes
-        if (parsedConfig.departmentColors) {
-          Object.keys(parsedConfig.departmentColors).forEach(dept => {
-            const color = parsedConfig.departmentColors[dept];
-            if (!color.startsWith('#')) {
-              parsedConfig.departmentColors[dept] = defaultConfig.departmentColors[dept] || defaultConfig.defaultNodeColor;
-            }
-          });
-        }
-        setConfig(current => ({ ...current, ...parsedConfig }));
+      const storedConfig = localStorage.getItem(CONFIG_STORAGE_KEY);
+      
+      if (storedConfig) {
+        const parsedConfig = JSON.parse(storedConfig);
+        setConfig(prevConfig => ({
+          ...prevConfig,
+          ...parsedConfig
+        }));
       }
+      
       setLoaded(true);
-    } catch (error) {
-      console.error('Error parsing organization chart configuration:', error);
+    } catch (err) {
+      console.error('Erreur lors du chargement de la configuration de l\'organigramme:', err);
+      setError('Impossible de charger la configuration de l\'organigramme.');
       setLoaded(true);
     }
   }, []);
 
-  // Update a specific configuration parameter
-  const updateConfig = (updates: Partial<OrgChartConfig>) => {
-    setConfig(current => {
-      const newConfig = { ...current, ...updates };
-      try {
-        localStorage.setItem('orgChartConfig', JSON.stringify(newConfig));
-      } catch (error) {
-        console.error('Error saving organization chart configuration:', error);
-      }
-      return newConfig;
-    });
-  };
-
-  // Reset configuration to defaults
-  const resetConfig = () => {
+  // Sauvegarder la configuration dans le stockage local
+  const saveConfig = useCallback((newConfig: Partial<OrgChartConfiguration>) => {
     try {
-      localStorage.removeItem('orgChartConfig');
-    } catch (error) {
-      console.error('Error removing organization chart configuration:', error);
+      // Mettre à jour l'état
+      setConfig(prevConfig => {
+        const updatedConfig = { ...prevConfig, ...newConfig };
+        
+        // Sauvegarder dans le stockage local
+        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(updatedConfig));
+        
+        return updatedConfig;
+      });
+      
+      return true;
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde de la configuration de l\'organigramme:', err);
+      setError('Impossible de sauvegarder la configuration de l\'organigramme.');
+      return false;
     }
-    setConfig(defaultConfig);
-  };
+  }, []);
+
+  // Réinitialiser la configuration aux valeurs par défaut
+  const resetConfig = useCallback(() => {
+    try {
+      setConfig(defaultConfig);
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(defaultConfig));
+      return true;
+    } catch (err) {
+      console.error('Erreur lors de la réinitialisation de la configuration de l\'organigramme:', err);
+      setError('Impossible de réinitialiser la configuration de l\'organigramme.');
+      return false;
+    }
+  }, []);
+
+  // Mettre à jour une couleur de département
+  const updateDepartmentColor = useCallback((department: string, color: string) => {
+    return saveConfig({
+      departmentColors: {
+        ...config.departmentColors,
+        [department]: color
+      }
+    });
+  }, [config.departmentColors, saveConfig]);
+
+  // Charger la configuration au montage du composant
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   return {
     config,
     loaded,
-    updateConfig,
-    resetConfig
+    error,
+    saveConfig,
+    resetConfig,
+    updateDepartmentColor
   };
 };
+
+export default useOrgChartConfig;

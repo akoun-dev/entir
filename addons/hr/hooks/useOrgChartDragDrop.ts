@@ -1,204 +1,196 @@
-
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { OrgChartPerson } from '../types/organization';
-import { toast } from 'sonner';
+import { useOrgChart } from './useOrgChart';
+import { useOrgChartConfig } from './useOrgChartConfig';
 
-export interface DragDropResult {
-  source: {
-    droppableId: string;
-    index: number;
-  };
-  destination?: {
-    droppableId: string;
-    index: number;
-  };
-  draggableId: string;
-  type?: string;
-  reason?: string;
-  mode?: string;
-}
-
-export const useOrgChartDragDrop = (
-  initialRoot: OrgChartPerson,
-  editModeEnabled: boolean,
-  readOnly: boolean,
-  onStructureChange?: (updatedRoot: OrgChartPerson) => void
-) => {
-  const [rootData, setRootData] = useState<OrgChartPerson>(
-    JSON.parse(JSON.stringify(initialRoot))
-  );
-  const [hasChanges, setHasChanges] = useState(false);
-  const initialRootRef = useRef<OrgChartPerson>(
-    JSON.parse(JSON.stringify(initialRoot))
-  );
-
-  // Update initialRootRef when initialRoot changes
-  useEffect(() => {
-    initialRootRef.current = JSON.parse(JSON.stringify(initialRoot));
-  }, [initialRoot]);
+/**
+ * Hook pour gérer le glisser-déposer dans l'organigramme
+ * 
+ * Ce hook permet de gérer les opérations de glisser-déposer dans l'organigramme,
+ * comme le déplacement d'un employé d'un manager à un autre.
+ */
+export const useOrgChartDragDrop = () => {
+  const { orgChartData, saveOrgChartData } = useOrgChart();
+  const { config } = useOrgChartConfig();
   
-  // Find a person in the tree by ID
-  const findPerson = useCallback((personId: string, node: OrgChartPerson): OrgChartPerson | null => {
-    if (node.id === personId) return node;
-    if (!node.children) return null;
+  // États pour le glisser-déposer
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedPerson, setDraggedPerson] = useState<OrgChartPerson | null>(null);
+  const [dropTarget, setDropTarget] = useState<OrgChartPerson | null>(null);
+  const [isDropAllowed, setIsDropAllowed] = useState(false);
+  
+  // Référence pour stocker le parent d'origine de l'élément déplacé
+  const originalParentRef = useRef<OrgChartPerson | null>(null);
+  
+  // Fonction pour démarrer le glisser-déposer
+  const handleDragStart = useCallback((person: OrgChartPerson, parent: OrgChartPerson | null) => {
+    if (!config.allowDragDrop) return false;
     
-    for (const child of node.children) {
-      const found = findPerson(personId, child);
-      if (found) return found;
+    setIsDragging(true);
+    setDraggedPerson(person);
+    originalParentRef.current = parent;
+    return true;
+  }, [config.allowDragDrop]);
+  
+  // Fonction pour gérer le survol d'une cible potentielle
+  const handleDragOver = useCallback((target: OrgChartPerson) => {
+    if (!isDragging || !draggedPerson) return;
+    
+    setDropTarget(target);
+    
+    // Vérifier si le dépôt est autorisé
+    let allowed = true;
+    
+    // Ne pas autoriser le dépôt sur soi-même
+    if (target.id === draggedPerson.id) {
+      allowed = false;
     }
     
-    return null;
-  }, []);
-
-  // Find the parent of a person
-  const findParent = useCallback((personId: string, node: OrgChartPerson): OrgChartPerson | null => {
-    if (!node.children) return null;
+    // Ne pas autoriser le dépôt sur un descendant direct
+    if (draggedPerson.children?.some(child => child.id === target.id)) {
+      allowed = false;
+    }
     
-    for (const child of node.children) {
-      if (child.id === personId) return node;
+    // Vérifier si la restriction au même niveau est activée
+    if (config.restrictDragToSameLevel) {
+      // Vérifier si la cible est au même niveau hiérarchique
+      // Cette vérification nécessite de connaître le niveau de chaque nœud
+      // Pour simplifier, on peut vérifier si les deux ont le même parent
+      const originalParent = originalParentRef.current;
+      const targetIsAtSameLevel = originalParent?.children?.some(child => child.id === target.id);
       
-      const found = findParent(personId, child);
-      if (found) return found;
+      if (!targetIsAtSameLevel) {
+        allowed = false;
+      }
     }
     
-    return null;
-  }, []);
-
-  // Check if node is a descendant to prevent cycles
-  const isDescendant = useCallback((potentialParent: OrgChartPerson | null, node: OrgChartPerson): boolean => {
-    if (!potentialParent) return false;
-    if (potentialParent.id === node.id) return true;
+    // Vérifier si la cible n'est pas un descendant indirect (pour éviter les cycles)
+    const isDescendant = (person: OrgChartPerson, potentialDescendant: OrgChartPerson): boolean => {
+      if (!person.children || person.children.length === 0) return false;
+      
+      return person.children.some(child => 
+        child.id === potentialDescendant.id || isDescendant(child, potentialDescendant)
+      );
+    };
     
-    if (!node.children) return false;
-    
-    for (const child of node.children) {
-      if (isDescendant(potentialParent, child)) return true;
+    if (isDescendant(draggedPerson, target)) {
+      allowed = false;
     }
     
-    return false;
-  }, []);
-
-  // Handle drag end event with more robust error handling
-  const handleDragEnd = useCallback((result: DragDropResult) => {
-    console.log("Drag end event:", result);
+    setIsDropAllowed(allowed);
+  }, [isDragging, draggedPerson, config.restrictDragToSameLevel]);
+  
+  // Fonction pour terminer le glisser-déposer
+  const handleDrop = useCallback(async () => {
+    if (!isDragging || !draggedPerson || !dropTarget || !isDropAllowed) {
+      // Réinitialiser les états
+      setIsDragging(false);
+      setDraggedPerson(null);
+      setDropTarget(null);
+      setIsDropAllowed(false);
+      return false;
+    }
+    
+    // Demander confirmation si nécessaire
+    if (config.confirmOnDrop) {
+      const confirmed = window.confirm(
+        `Êtes-vous sûr de vouloir déplacer ${draggedPerson.name} sous la responsabilité de ${dropTarget.name} ?`
+      );
+      
+      if (!confirmed) {
+        // Réinitialiser les états
+        setIsDragging(false);
+        setDraggedPerson(null);
+        setDropTarget(null);
+        setIsDropAllowed(false);
+        return false;
+      }
+    }
     
     try {
-      const { source, destination, draggableId } = result;
-      
-      // Verifier si le mode édition est activé
-      if (!editModeEnabled || readOnly) {
-        console.log("Drag and drop disabled: edit mode or read-only");
-        return;
-      }
-      
-      // Dropped outside the list or didn't move
-      if (!destination || 
-          (source.droppableId === destination.droppableId && 
-           source.index === destination.index)) {
-        console.log("No destination or same position, ignoring");
-        return;
-      }
-
-      // Clone the current structure to avoid direct mutations
-      const newRoot = JSON.parse(JSON.stringify(rootData));
-      
-      // Find the dragged person
-      const draggedPerson = findPerson(draggableId, newRoot);
-      if (!draggedPerson) {
-        toast.error("Employé non trouvé");
-        return;
-      }
-      
-      // Find the destination parent
-      const destParent = findPerson(destination.droppableId, newRoot);
-      if (!destParent) {
-        toast.error("Destination non trouvée");
-        return;
-      }
-      
-      // Cannot move to a position that would create a cycle
-      if (isDescendant(draggedPerson, destParent)) {
-        toast.error("Déplacement impossible : cela créerait une boucle hiérarchique");
-        return;
-      }
-      
-      // Remove from current parent
-      const sourceParent = findParent(draggableId, newRoot);
-      if (sourceParent && sourceParent.children) {
-        sourceParent.children = sourceParent.children.filter(child => child.id !== draggableId);
-        
-        // If parent has no more children, set children to undefined
-        if (sourceParent.children.length === 0) {
-          sourceParent.children = undefined;
+      // Fonction récursive pour mettre à jour l'arbre
+      const updateTree = (person: OrgChartPerson): OrgChartPerson => {
+        // Si c'est la personne à déplacer, ne pas la copier ici
+        if (person.id === draggedPerson.id) {
+          return { ...person, children: person.children?.map(updateTree) || [] };
         }
+        
+        // Si c'est la cible, ajouter la personne déplacée comme enfant
+        if (person.id === dropTarget.id) {
+          const updatedChildren = [...(person.children || [])];
+          
+          // Vérifier si la personne déplacée est déjà un enfant
+          const existingIndex = updatedChildren.findIndex(child => child.id === draggedPerson.id);
+          
+          if (existingIndex === -1) {
+            // Ajouter la personne déplacée comme enfant
+            updatedChildren.push({
+              ...draggedPerson,
+              children: draggedPerson.children?.map(updateTree) || []
+            });
+          }
+          
+          return {
+            ...person,
+            children: updatedChildren
+          };
+        }
+        
+        // Pour les autres personnes, mettre à jour récursivement
+        return {
+          ...person,
+          children: person.children
+            ?.filter(child => child.id !== draggedPerson.id) // Supprimer la personne déplacée
+            .map(updateTree) || []
+        };
+      };
+      
+      // Mettre à jour l'arbre
+      if (orgChartData.rootPerson) {
+        const updatedRootPerson = updateTree(orgChartData.rootPerson);
+        
+        // Sauvegarder les modifications
+        await saveOrgChartData(updatedRootPerson);
       }
       
-      // Add to new parent
-      if (!destParent.children) {
-        destParent.children = [];
-      }
+      // Réinitialiser les états
+      setIsDragging(false);
+      setDraggedPerson(null);
+      setDropTarget(null);
+      setIsDropAllowed(false);
       
-      // Create a new child node with the same data
-      const newChild = { ...draggedPerson };
-      
-      // Update department if moving between departments
-      if (destParent.department && destParent.department !== newChild.department) {
-        newChild.department = destParent.department;
-      }
-      
-      // Insert at the correct position
-      destParent.children.splice(destination.index, 0, newChild);
-      
-      console.log("Updated structure:", newRoot);
-      
-      // Update state
-      setRootData(newRoot);
-      setHasChanges(true);
-      toast.success("Position mise à jour");
+      return true;
     } catch (error) {
-      console.error("Erreur lors du déplacement:", error);
-      toast.error("Une erreur est survenue lors du déplacement");
+      console.error('Erreur lors du déplacement dans l\'organigramme:', error);
+      
+      // Réinitialiser les états
+      setIsDragging(false);
+      setDraggedPerson(null);
+      setDropTarget(null);
+      setIsDropAllowed(false);
+      
+      return false;
     }
-  }, [rootData, editModeEnabled, readOnly, findPerson, findParent, isDescendant]);
-
-  // Update rootData when initialRoot changes
-  const updateRootData = useCallback((newRoot: OrgChartPerson) => {
-    if (JSON.stringify(newRoot) !== JSON.stringify(rootData)) {
-      const clonedRoot = JSON.parse(JSON.stringify(newRoot));
-      setRootData(clonedRoot);
-      initialRootRef.current = JSON.parse(JSON.stringify(newRoot));
-      setHasChanges(false);
-    }
-  }, [rootData]);
-
-  // Save changes
-  const handleSaveChanges = useCallback(() => {
-    if (onStructureChange) {
-      try {
-        onStructureChange(rootData);
-        initialRootRef.current = JSON.parse(JSON.stringify(rootData));
-        setHasChanges(false);
-        toast.success("Changements enregistrés");
-      } catch (error) {
-        console.error("Erreur lors de l'enregistrement des changements:", error);
-        toast.error("Erreur lors de l'enregistrement des changements");
-      }
-    }
-  }, [rootData, onStructureChange]);
-
-  // Discard changes
-  const handleDiscardChanges = useCallback(() => {
-    setRootData(JSON.parse(JSON.stringify(initialRootRef.current)));
-    setHasChanges(false);
-    toast.info("Changements annulés");
+  }, [isDragging, draggedPerson, dropTarget, isDropAllowed, config.confirmOnDrop, orgChartData.rootPerson, saveOrgChartData]);
+  
+  // Fonction pour annuler le glisser-déposer
+  const handleDragCancel = useCallback(() => {
+    setIsDragging(false);
+    setDraggedPerson(null);
+    setDropTarget(null);
+    setIsDropAllowed(false);
   }, []);
-
+  
   return {
-    rootData,
-    hasChanges,
-    handleDragEnd,
-    handleSaveChanges,
-    handleDiscardChanges,
-    updateRootData
+    isDragging,
+    draggedPerson,
+    dropTarget,
+    isDropAllowed,
+    handleDragStart,
+    handleDragOver,
+    handleDrop,
+    handleDragCancel
   };
 };
+
+export default useOrgChartDragDrop;

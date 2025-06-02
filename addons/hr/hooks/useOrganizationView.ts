@@ -1,152 +1,173 @@
-
 import { useState, useCallback, useEffect } from 'react';
-import { OrgChartPerson, OrgChartDepartment, OrgChartData } from '../types/organization';
 import { useOrgChart } from './useOrgChart';
-import { toast } from 'sonner';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useOrgChartConfig } from './useOrgChartConfig';
+import { OrgChartPerson, Department } from '../types/organization';
 
+/**
+ * Hook pour gérer la vue de l'organisation
+ * 
+ * Ce hook combine les fonctionnalités de l'organigramme et de sa configuration
+ * pour fournir une interface unifiée pour les composants de vue de l'organisation.
+ */
 export const useOrganizationView = () => {
-  const { orgChartData, loading, error, loadOrgChartData, saveOrgChartData, isApiMode } = useOrgChart();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const { 
+    orgChartData, 
+    loading, 
+    error, 
+    lastUpdated, 
+    searchPerson, 
+    loadOrgChartData, 
+    saveOrgChartData,
+    isApiMode 
+  } = useOrgChart();
   
-  // Get the active tab from URL query params or localStorage
-  const getInitialTab = () => {
-    const params = new URLSearchParams(location.search);
-    const tabFromUrl = params.get('tab');
-    
-    if (tabFromUrl && ['chart', 'departments', 'employees'].includes(tabFromUrl)) {
-      return tabFromUrl;
-    }
-    
-    const savedTab = localStorage.getItem('orgChartActiveTab');
-    if (savedTab && ['chart', 'departments', 'employees'].includes(savedTab)) {
-      return savedTab;
-    }
-    
-    return 'chart'; // Default tab
-  };
-
-  const [activeTab, setActiveTab] = useState(getInitialTab());
+  const { 
+    config, 
+    loaded: configLoaded, 
+    saveConfig 
+  } = useOrgChartConfig();
+  
+  // États supplémentaires pour la vue
   const [selectedPerson, setSelectedPerson] = useState<OrgChartPerson | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<OrgChartDepartment | null>(null);
-  const [configDialogOpen, setConfigDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [localOrgData, setLocalOrgData] = useState<OrgChartData | null>(null);
-  const [loadingUpdate, setLoadingUpdate] = useState(false);
-
-  // Save active tab to localStorage and update URL when it changes
-  useEffect(() => {
-    localStorage.setItem('orgChartActiveTab', activeTab);
-    
-    // Update URL query params without full navigation
-    const params = new URLSearchParams(location.search);
-    params.set('tab', activeTab);
-    const newUrl = `${location.pathname}?${params.toString()}`;
-    navigate(newUrl, { replace: true });
-  }, [activeTab, location.pathname, location.search, navigate]);
-
-  // Update tab handler with debounce protection
-  const handleTabChange = useCallback((newTab: string) => {
-    if (loadingUpdate) return; // Prevent tab changes during loading
-    setActiveTab(newTab);
-  }, [loadingUpdate]);
-
-  // Load organization data when component mounts
-  useEffect(() => {
-    if (orgChartData && Object.keys(orgChartData).length > 0) {
-      setLocalOrgData(orgChartData);
-    }
-  }, [orgChartData]);
-
-  // Refresh data function with debouncing
-  const refreshData = useCallback(async () => {
-    if (loadingUpdate) return; // Prevent multiple simultaneous refreshes
-    
-    setLoadingUpdate(true);
-    try {
-      await loadOrgChartData();
-      toast.success("Données de l'organigramme mises à jour");
-    } catch (error) {
-      toast.error("Erreur lors de la mise à jour des données");
-    } finally {
-      setLoadingUpdate(false);
-    }
-  }, [loadOrgChartData, loadingUpdate]);
-
-  const handlePersonClick = useCallback((person: OrgChartPerson) => {
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+  const [viewMode, setViewMode] = useState<'chart' | 'list' | 'grid'>('chart');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<OrgChartPerson[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  
+  // Fonction pour sélectionner une personne
+  const handleSelectPerson = useCallback((person: OrgChartPerson | null) => {
     setSelectedPerson(person);
-    setSelectedDepartment(null); // Clear other selection
-  }, []);
-
-  const handleDepartmentClick = useCallback((department: OrgChartDepartment) => {
-    setSelectedDepartment(department);
-    setSelectedPerson(null); // Clear other selection
-  }, []);
-
-  const handleStructureChange = useCallback((updatedRoot: OrgChartPerson) => {
-    // In a real app, this would call an API to save the changes
-    setLocalOrgData(prev => {
-      if (!prev) return orgChartData;
-      return {
-        ...prev,
-        rootPerson: updatedRoot
-      };
-    });
     
-    setHasUnsavedChanges(true);
-    toast.success("Structure de l'organigramme mise à jour");
-  }, [orgChartData]);
-
-  const handleSaveOrganizationData = useCallback(async () => {
-    if (!localOrgData || !localOrgData.rootPerson) return;
-    
-    setLoadingUpdate(true);
-    try {
-      // Save using the API service
-      const success = await saveOrgChartData(localOrgData.rootPerson);
+    // Si une personne est sélectionnée, trouver son département
+    if (person && orgChartData.departments) {
+      const dept = orgChartData.departments.find(d => 
+        d.employees?.some(e => e.id === person.id)
+      );
       
-      if (success) {
-        toast.success(isApiMode ? 
-          "Données enregistrées dans la base de données" : 
-          "Données enregistrées localement (mode hors ligne)"
-        );
-        setHasUnsavedChanges(false);
-      } else {
-        throw new Error("Échec de l'enregistrement");
-      }
-    } catch (error) {
-      console.error("Erreur lors de l'enregistrement:", error);
-      toast.error("Erreur lors de l'enregistrement des modifications");
-    } finally {
-      setLoadingUpdate(false);
+      setSelectedDepartment(dept || null);
+    } else {
+      setSelectedDepartment(null);
     }
-  }, [localOrgData, saveOrgChartData, isApiMode]);
-
-  // Use local data if available, otherwise use data from the hook
-  const displayData = localOrgData || orgChartData;
-
+  }, [orgChartData.departments]);
+  
+  // Fonction pour sélectionner un département
+  const handleSelectDepartment = useCallback((department: Department | null) => {
+    setSelectedDepartment(department);
+    
+    // Si un département est sélectionné, sélectionner son manager
+    if (department) {
+      setSelectedPerson(department.manager || null);
+    } else {
+      setSelectedPerson(null);
+    }
+  }, []);
+  
+  // Fonction pour changer le mode d'affichage
+  const handleChangeViewMode = useCallback((mode: 'chart' | 'list' | 'grid') => {
+    setViewMode(mode);
+    
+    // Sauvegarder la préférence dans la configuration
+    saveConfig({ displayMode: mode });
+  }, [saveConfig]);
+  
+  // Fonction pour effectuer une recherche
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    
+    setIsSearching(true);
+    const results = searchPerson(query);
+    setSearchResults(results);
+    setIsSearching(false);
+  }, [searchPerson]);
+  
+  // Fonction pour zoomer
+  const handleZoom = useCallback((level: number) => {
+    // Limiter le niveau de zoom entre 0.5 et 2
+    const newZoomLevel = Math.max(0.5, Math.min(2, level));
+    setZoomLevel(newZoomLevel);
+  }, []);
+  
+  // Fonction pour zoomer in/out
+  const handleZoomIn = useCallback(() => {
+    handleZoom(zoomLevel + 0.1);
+  }, [zoomLevel, handleZoom]);
+  
+  const handleZoomOut = useCallback(() => {
+    handleZoom(zoomLevel - 0.1);
+  }, [zoomLevel, handleZoom]);
+  
+  const handleResetZoom = useCallback(() => {
+    setZoomLevel(1);
+  }, []);
+  
+  // Initialiser le mode d'affichage à partir de la configuration
+  useEffect(() => {
+    if (configLoaded && config.displayMode) {
+      setViewMode(config.displayMode as 'chart' | 'list' | 'grid');
+    }
+  }, [configLoaded, config.displayMode]);
+  
+  // Fonction pour exporter l'organigramme
+  const exportOrgChart = useCallback((format: 'pdf' | 'png' | 'svg' = 'pdf') => {
+    // Cette fonction serait implémentée avec une bibliothèque d'exportation
+    // comme html2canvas, jsPDF, etc.
+    console.log(`Exporting org chart as ${format}...`);
+    
+    // Exemple d'implémentation simulée
+    alert(`L'exportation au format ${format.toUpperCase()} sera disponible prochainement.`);
+    
+    return true;
+  }, []);
+  
   return {
-    activeTab,
-    setActiveTab: handleTabChange,
+    // Données de l'organigramme
+    orgChartData,
+    loading,
+    error,
+    lastUpdated,
+    isApiMode,
+    
+    // Configuration
+    config,
+    configLoaded,
+    saveConfig,
+    
+    // Sélection
     selectedPerson,
     selectedDepartment,
-    configDialogOpen,
-    setConfigDialogOpen,
-    importDialogOpen,
-    setImportDialogOpen,
-    hasUnsavedChanges,
-    localOrgData,
-    displayData,
-    loading,
-    loadingUpdate,
-    error,
-    isApiMode,
-    handlePersonClick,
-    handleDepartmentClick,
-    handleStructureChange,
-    handleSaveOrganizationData,
-    refreshData
+    handleSelectPerson,
+    handleSelectDepartment,
+    
+    // Mode d'affichage
+    viewMode,
+    handleChangeViewMode,
+    
+    // Recherche
+    searchQuery,
+    searchResults,
+    isSearching,
+    handleSearch,
+    
+    // Zoom
+    zoomLevel,
+    handleZoom,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    
+    // Actions
+    loadOrgChartData,
+    saveOrgChartData,
+    exportOrgChart
   };
 };
+
+export default useOrganizationView;

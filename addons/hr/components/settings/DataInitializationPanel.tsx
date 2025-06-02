@@ -8,8 +8,35 @@ import { Switch } from '../../../../src/components/ui/switch';
 import { Label } from '../../../../src/components/ui/label';
 import { Badge } from '../../../../src/components/ui/badge';
 import { FileUp, Download, Check, Save, Database, Trash } from 'lucide-react';
-import { useDataInitialization, DataExportOptions, DataImportResult } from '../../services/dataInitialization';
+import { useDataInitialization } from '../../services/dataInitialization';
 import { Progress } from '../../../../src/components/ui/progress';
+
+/**
+ * Options d'exportation de données
+ */
+interface DataExportOptions {
+  includeEmployees: boolean;
+  includeDepartments: boolean;
+  includeRecruitment: boolean;
+  includeTraining: boolean;
+  [key: string]: boolean;
+}
+
+/**
+ * Résultat d'importation de données
+ */
+interface DataImportResult {
+  success: boolean;
+  message?: string;
+  total: number;
+  imported: number;
+  skipped: number;
+  errors: Array<{
+    row?: number;
+    field?: string;
+    message: string;
+  }>;
+}
 
 /**
  * Panel de gestion pour l'initialisation des données
@@ -60,7 +87,7 @@ const DataInitializationPanel: React.FC = () => {
   // Lance l'importation des données
   const handleImport = async () => {
     if (!selectedFile) return;
-    
+
     // Simuler une progression
     const interval = setInterval(() => {
       setImportProgress(prev => {
@@ -71,12 +98,12 @@ const DataInitializationPanel: React.FC = () => {
         return prev + 10;
       });
     }, 200);
-    
+
     try {
       const result = await importData(selectedFile);
       setImportResult(result);
       setImportProgress(100);
-      
+
       // Réinitialiser après 3 secondes
       setTimeout(() => {
         setImportProgress(0);
@@ -111,7 +138,7 @@ const DataInitializationPanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" /> 
+            <Database className="h-5 w-5" />
             Initialisation des données
           </CardTitle>
           <CardDescription>
@@ -139,7 +166,7 @@ const DataInitializationPanel: React.FC = () => {
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="flex items-center space-x-2">
-                        <Switch 
+                        <Switch
                           id="export-employees"
                           checked={exportOptions.includeEmployees}
                           onCheckedChange={() => handleExportOptionChange('includeEmployees')}
@@ -147,7 +174,7 @@ const DataInitializationPanel: React.FC = () => {
                         <Label htmlFor="export-employees">Employés</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Switch 
+                        <Switch
                           id="export-departments"
                           checked={exportOptions.includeDepartments}
                           onCheckedChange={() => handleExportOptionChange('includeDepartments')}
@@ -155,7 +182,7 @@ const DataInitializationPanel: React.FC = () => {
                         <Label htmlFor="export-departments">Départements</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Switch 
+                        <Switch
                           id="export-recruitment"
                           checked={exportOptions.includeRecruitment}
                           onCheckedChange={() => handleExportOptionChange('includeRecruitment')}
@@ -163,7 +190,7 @@ const DataInitializationPanel: React.FC = () => {
                         <Label htmlFor="export-recruitment">Recrutement</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Switch 
+                        <Switch
                           id="export-training"
                           checked={exportOptions.includeTraining}
                           onCheckedChange={() => handleExportOptionChange('includeTraining')}
@@ -191,15 +218,15 @@ const DataInitializationPanel: React.FC = () => {
                   <div className="grid w-full items-center gap-4">
                     <div className="flex flex-col space-y-1.5">
                       <Label htmlFor="import-file">Fichier d'import (JSON)</Label>
-                      <Input 
-                        id="import-file" 
-                        type="file" 
+                      <Input
+                        id="import-file"
+                        type="file"
                         accept=".json"
                         onChange={handleFileChange}
                       />
                     </div>
                   </div>
-                  
+
                   {importProgress > 0 && (
                     <div className="space-y-2">
                       <Progress value={importProgress} className="h-2" />
@@ -208,7 +235,7 @@ const DataInitializationPanel: React.FC = () => {
                       </p>
                     </div>
                   )}
-                  
+
                   {importResult && (
                     <div className={`p-3 rounded-md ${importResult.success ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
                       <p className={`text-sm font-medium ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
@@ -233,10 +260,10 @@ const DataInitializationPanel: React.FC = () => {
                       )}
                     </div>
                   )}
-                  
-                  <Button 
-                    onClick={handleImport} 
-                    disabled={!selectedFile || importProgress > 0} 
+
+                  <Button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importProgress > 0}
                     className="w-full sm:w-auto"
                   >
                     <Save className="h-4 w-4 mr-2" />

@@ -1,179 +1,422 @@
-
-import { useState } from 'react';
-import { toast } from "@/hooks/use-toast";
-import { leaves, leaveTypes, leaveBalances } from '../data/leaves';
+import { useState, useEffect, useCallback } from 'react';
 import { Leave, LeaveType, LeaveRequest, LeaveBalance } from '../types';
+import { leaveService } from '../services';
 
+/**
+ * Hook pour gérer les congés
+ * 
+ * Ce hook fournit des fonctionnalités pour gérer les congés, les types de congés
+ * et les soldes de congés dans le module RH.
+ */
 export const useLeaves = () => {
-  const [leavesList, setLeavesList] = useState<Leave[]>(leaves);
-  const [loading, setLoading] = useState<boolean>(false);
+  // États pour les congés
+  const [leavesList, setLeavesList] = useState<Leave[]>([]);
+  const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Fonction pour récupérer tous les congés
-  const getAllLeaves = () => {
-    setLoading(true);
-    setError(null);
-    
+  
+  // États pour les types de congés
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
+  const [typesError, setTypesError] = useState<string | null>(null);
+  
+  // États pour les soldes de congés
+  const [leaveBalances, setLeaveBalances] = useState<Record<string, LeaveBalance[]>>({});
+  const [loadingBalances, setLoadingBalances] = useState(false);
+  const [balancesError, setBalancesError] = useState<string | null>(null);
+  
+  /**
+   * Récupère tous les congés
+   */
+  const getAllLeaves = useCallback(async () => {
     try {
-      // Simuler un délai de chargement
-      setTimeout(() => {
-        setLeavesList(leaves);
-        setLoading(false);
-      }, 500);
+      setLoading(true);
+      setError(null);
+      
+      const leaves = await leaveService.getAll();
+      setLeavesList(leaves);
+      
+      return leaves;
     } catch (err) {
-      setError('Erreur lors du chargement des congés');
+      console.error('Erreur lors du chargement des congés:', err);
+      setError('Impossible de charger la liste des congés.');
+      return [];
+    } finally {
       setLoading(false);
     }
-  };
-
-  // Fonction pour récupérer les congés d'un employé
-  const getEmployeeLeaves = (employeeId: string) => {
-    setLoading(true);
-    setError(null);
-    
+  }, []);
+  
+  /**
+   * Récupère un congé par son ID
+   * @param id ID du congé
+   */
+  const getLeaveById = useCallback(async (id: string) => {
     try {
-      // Simuler un délai de chargement
-      setTimeout(() => {
-        const filteredLeaves = leaves.filter(leave => leave.employee_id === employeeId);
-        setLeavesList(filteredLeaves);
-        setLoading(false);
-      }, 500);
+      setLoading(true);
+      setError(null);
+      
+      const leave = await leaveService.getById(id);
+      setSelectedLeave(leave);
+      
+      return leave;
     } catch (err) {
-      setError('Erreur lors du chargement des congés');
+      console.error(`Erreur lors du chargement du congé ${id}:`, err);
+      setError(`Impossible de charger le congé ${id}.`);
+      return null;
+    } finally {
       setLoading(false);
     }
-  };
-
-  // Fonction pour créer une demande de congé
-  const createLeaveRequest = (leaveRequest: LeaveRequest) => {
-    setLoading(true);
-    setError(null);
-    
+  }, []);
+  
+  /**
+   * Récupère les congés d'un employé
+   * @param employeeId ID de l'employé
+   */
+  const getEmployeeLeaves = useCallback(async (employeeId: string) => {
     try {
-      // Générer un nouvel ID (dans une vraie application, cela serait fait côté serveur)
-      const newId = (Math.max(...leavesList.map(leave => parseInt(leave.id))) + 1).toString();
+      setLoading(true);
+      setError(null);
       
-      // Calculer le nombre de jours (simplifié)
-      const startDate = new Date(leaveRequest.date_from);
-      const endDate = new Date(leaveRequest.date_to);
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const leaves = await leaveService.getByEmployee(employeeId);
       
-      // Trouver le type de congé
-      const leaveType = leaveTypes.find(type => type.id === leaveRequest.type);
-      
-      // Créer le nouvel objet de congé
-      const newLeave: Leave = {
-        id: newId,
-        employee_id: leaveRequest.employee_id,
-        date_from: leaveRequest.date_from,
-        date_to: leaveRequest.date_to,
-        number_of_days: diffDays,
-        state: 'submitted',
-        type: leaveRequest.type,
-        type_name: leaveType?.name,
-        description: leaveRequest.description,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      // Ajouter le congé à la liste
-      setTimeout(() => {
-        setLeavesList([...leavesList, newLeave]);
-        setLoading(false);
-        toast({
-          title: "Demande créée",
-          description: "Votre demande de congé a été soumise avec succès."
-        });
-      }, 500);
-    } catch (err) {
-      setError('Erreur lors de la création de la demande');
-      setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de créer la demande de congé."
+      // Mettre à jour la liste des congés avec les congés de l'employé
+      setLeavesList(prevLeaves => {
+        const otherLeaves = prevLeaves.filter(leave => leave.employee_id !== employeeId);
+        return [...otherLeaves, ...leaves];
       });
+      
+      return leaves;
+    } catch (err) {
+      console.error(`Erreur lors du chargement des congés de l'employé ${employeeId}:`, err);
+      setError(`Impossible de charger les congés de l'employé ${employeeId}.`);
+      return [];
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // Fonction pour mettre à jour le statut d'un congé
-  const updateLeaveStatus = (leaveId: string, newStatus: Leave['state']) => {
-    setLoading(true);
-    setError(null);
-    
+  }, []);
+  
+  /**
+   * Crée une demande de congé
+   * @param leaveRequest Données de la demande de congé
+   */
+  const createLeaveRequest = useCallback(async (leaveRequest: LeaveRequest) => {
     try {
-      setTimeout(() => {
-        const updatedLeaves = leavesList.map(leave => 
-          leave.id === leaveId 
-            ? { ...leave, state: newStatus, updated_at: new Date().toISOString() } 
-            : leave
+      setLoading(true);
+      setError(null);
+      
+      const newLeave = await leaveService.create(leaveRequest);
+      
+      // Ajouter le nouveau congé à la liste
+      setLeavesList(prevLeaves => [...prevLeaves, newLeave]);
+      
+      return newLeave;
+    } catch (err) {
+      console.error('Erreur lors de la création de la demande de congé:', err);
+      setError('Impossible de créer la demande de congé.');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  /**
+   * Met à jour le statut d'un congé
+   * @param id ID du congé
+   * @param status Nouveau statut
+   * @param comment Commentaire optionnel
+   */
+  const updateLeaveStatus = useCallback(async (
+    id: string,
+    status: 'draft' | 'submitted' | 'approved' | 'refused' | 'cancelled',
+    comment?: string
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const updatedLeave = await leaveService.updateStatus(id, status, comment);
+      
+      // Mettre à jour la liste des congés
+      setLeavesList(prevLeaves => 
+        prevLeaves.map(leave => leave.id === id ? updatedLeave : leave)
+      );
+      
+      // Mettre à jour le congé sélectionné si nécessaire
+      if (selectedLeave && selectedLeave.id === id) {
+        setSelectedLeave(updatedLeave);
+      }
+      
+      return updatedLeave;
+    } catch (err) {
+      console.error(`Erreur lors de la mise à jour du statut du congé ${id}:`, err);
+      setError(`Impossible de mettre à jour le statut du congé ${id}.`);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedLeave]);
+  
+  /**
+   * Supprime un congé
+   * @param id ID du congé
+   */
+  const deleteLeave = useCallback(async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const result = await leaveService.delete(id);
+      
+      if (result.success) {
+        // Supprimer le congé de la liste
+        setLeavesList(prevLeaves => prevLeaves.filter(leave => leave.id !== id));
+        
+        // Réinitialiser le congé sélectionné si nécessaire
+        if (selectedLeave && selectedLeave.id === id) {
+          setSelectedLeave(null);
+        }
+      }
+      
+      return result.success;
+    } catch (err) {
+      console.error(`Erreur lors de la suppression du congé ${id}:`, err);
+      setError(`Impossible de supprimer le congé ${id}.`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedLeave]);
+  
+  /**
+   * Récupère tous les types de congés
+   */
+  const loadLeaveTypes = useCallback(async () => {
+    try {
+      setLoadingTypes(true);
+      setTypesError(null);
+      
+      const types = await leaveService.getLeaveTypes();
+      setLeaveTypes(types);
+      
+      return types;
+    } catch (err) {
+      console.error('Erreur lors du chargement des types de congés:', err);
+      setTypesError('Impossible de charger les types de congés.');
+      return [];
+    } finally {
+      setLoadingTypes(false);
+    }
+  }, []);
+  
+  /**
+   * Récupère les types de congés (ou utilise les données en cache)
+   */
+  const getLeaveTypes = useCallback(() => {
+    // Si les types de congés ne sont pas encore chargés, les charger
+    if (leaveTypes.length === 0 && !loadingTypes) {
+      loadLeaveTypes();
+    }
+    
+    // En attendant, retourner des données simulées
+    if (leaveTypes.length === 0) {
+      return [
+        {
+          id: "1",
+          name: "Congés payés",
+          code: "CP",
+          color: "#10B981", // Emerald
+          requires_approval: true,
+          active: true
+        },
+        {
+          id: "2",
+          name: "RTT",
+          code: "RTT",
+          color: "#3B82F6", // Blue
+          requires_approval: true,
+          active: true
+        },
+        {
+          id: "3",
+          name: "Congé maladie",
+          code: "CM",
+          color: "#F59E0B", // Amber
+          requires_approval: false,
+          active: true
+        },
+        {
+          id: "4",
+          name: "Congé sans solde",
+          code: "CSS",
+          color: "#6366F1", // Indigo
+          requires_approval: true,
+          active: true
+        }
+      ];
+    }
+    
+    return leaveTypes;
+  }, [leaveTypes, loadingTypes, loadLeaveTypes]);
+  
+  /**
+   * Récupère les soldes de congés d'un employé
+   * @param employeeId ID de l'employé
+   */
+  const loadEmployeeLeaveBalances = useCallback(async (employeeId: string) => {
+    try {
+      setLoadingBalances(true);
+      setBalancesError(null);
+      
+      const balances = await leaveService.getLeaveBalances(employeeId);
+      
+      // Mettre à jour les soldes de congés
+      setLeaveBalances(prevBalances => ({
+        ...prevBalances,
+        [employeeId]: balances
+      }));
+      
+      return balances;
+    } catch (err) {
+      console.error(`Erreur lors du chargement des soldes de congés de l'employé ${employeeId}:`, err);
+      setBalancesError(`Impossible de charger les soldes de congés de l'employé ${employeeId}.`);
+      return [];
+    } finally {
+      setLoadingBalances(false);
+    }
+  }, []);
+  
+  /**
+   * Récupère les soldes de congés d'un employé (ou utilise les données en cache)
+   * @param employeeId ID de l'employé
+   */
+  const getEmployeeLeaveBalances = useCallback((employeeId: string) => {
+    // Si les soldes de congés de l'employé ne sont pas encore chargés, les charger
+    if (!leaveBalances[employeeId] && !loadingBalances) {
+      loadEmployeeLeaveBalances(employeeId);
+    }
+    
+    // En attendant, retourner des données simulées
+    if (!leaveBalances[employeeId]) {
+      return [
+        {
+          id: "1",
+          employee_id: employeeId,
+          leave_type_id: "1",
+          leave_type_name: "Congés payés",
+          total_allocated: 25,
+          total_taken: 12,
+          remaining: 13,
+          year: new Date().getFullYear()
+        },
+        {
+          id: "2",
+          employee_id: employeeId,
+          leave_type_id: "2",
+          leave_type_name: "RTT",
+          total_allocated: 12,
+          total_taken: 5,
+          remaining: 7,
+          year: new Date().getFullYear()
+        },
+        {
+          id: "3",
+          employee_id: employeeId,
+          leave_type_id: "3",
+          leave_type_name: "Congé maladie",
+          total_allocated: 0,
+          total_taken: 3,
+          remaining: 0,
+          year: new Date().getFullYear()
+        }
+      ];
+    }
+    
+    return leaveBalances[employeeId];
+  }, [leaveBalances, loadingBalances, loadEmployeeLeaveBalances]);
+  
+  /**
+   * Alloue des jours de congés à un employé
+   * @param employeeId ID de l'employé
+   * @param leaveTypeId ID du type de congé
+   * @param days Nombre de jours à allouer
+   * @param year Année concernée
+   */
+  const allocateLeaves = useCallback(async (
+    employeeId: string,
+    leaveTypeId: string,
+    days: number,
+    year: number = new Date().getFullYear()
+  ) => {
+    try {
+      setLoadingBalances(true);
+      setBalancesError(null);
+      
+      const updatedBalance = await leaveService.allocateLeaves(employeeId, leaveTypeId, days, year);
+      
+      // Mettre à jour les soldes de congés
+      setLeaveBalances(prevBalances => {
+        const employeeBalances = prevBalances[employeeId] || [];
+        const otherBalances = employeeBalances.filter(balance => 
+          balance.leave_type_id !== leaveTypeId || balance.year !== year
         );
         
-        setLeavesList(updatedLeaves);
-        setLoading(false);
-        
-        toast({
-          title: "Statut mis à jour",
-          description: `Le statut du congé a été mis à jour avec succès.`
-        });
-      }, 500);
-    } catch (err) {
-      setError('Erreur lors de la mise à jour du statut');
-      setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de mettre à jour le statut du congé."
+        return {
+          ...prevBalances,
+          [employeeId]: [...otherBalances, updatedBalance]
+        };
       });
-    }
-  };
-
-  // Fonction pour supprimer un congé
-  const deleteLeave = (leaveId: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      setTimeout(() => {
-        const filteredLeaves = leavesList.filter(leave => leave.id !== leaveId);
-        setLeavesList(filteredLeaves);
-        setLoading(false);
-        
-        toast({
-          title: "Congé supprimé",
-          description: "La demande de congé a été supprimée avec succès."
-        });
-      }, 500);
+      
+      return updatedBalance;
     } catch (err) {
-      setError('Erreur lors de la suppression du congé');
-      setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible de supprimer la demande de congé."
-      });
+      console.error(`Erreur lors de l'allocation de congés à l'employé ${employeeId}:`, err);
+      setBalancesError(`Impossible d'allouer des congés à l'employé ${employeeId}.`);
+      return null;
+    } finally {
+      setLoadingBalances(false);
     }
-  };
-
-  // Obtenir tous les types de congés
-  const getLeaveTypes = () => leaveTypes;
-
-  // Obtenir les soldes de congés d'un employé
-  const getEmployeeLeaveBalances = (employeeId: string) => {
-    return leaveBalances.filter(balance => balance.employee_id === employeeId);
-  };
-
+  }, []);
+  
+  // Charger les données initiales
+  useEffect(() => {
+    getAllLeaves();
+    loadLeaveTypes();
+  }, [getAllLeaves, loadLeaveTypes]);
+  
   return {
+    // Données
     leavesList,
+    selectedLeave,
+    leaveTypes,
+    leaveBalances,
+    
+    // États de chargement
     loading,
+    loadingTypes,
+    loadingBalances,
+    
+    // Erreurs
     error,
+    typesError,
+    balancesError,
+    
+    // Méthodes pour les congés
     getAllLeaves,
+    getLeaveById,
     getEmployeeLeaves,
     createLeaveRequest,
     updateLeaveStatus,
     deleteLeave,
+    setSelectedLeave,
+    
+    // Méthodes pour les types de congés
+    loadLeaveTypes,
     getLeaveTypes,
-    getEmployeeLeaveBalances
+    
+    // Méthodes pour les soldes de congés
+    loadEmployeeLeaveBalances,
+    getEmployeeLeaveBalances,
+    allocateLeaves
   };
 };
+
+export default useLeaves;
